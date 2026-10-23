@@ -1,0 +1,327 @@
+import { useEffect, useRef, useState } from 'react'
+import { CARTOON_COLORS, cartoonDataUri, listCartoonAssets } from '../lib/cartoon'
+import { compressImage } from '../lib/image'
+import { useWardrobe } from '../store/wardrobe'
+import { CATEGORIES, CATEGORY_META, IMAGE_MODES, IMAGE_MODE_META } from '../types'
+import type { Category, ImageMode } from '../types'
+
+function AssetThumb({
+  photoPath,
+  name,
+  selected,
+  onSelect,
+  onDelete
+}: {
+  photoPath: string
+  name: string
+  selected: boolean
+  onSelect: () => void
+  onDelete?: () => void
+}) {
+  const { photoUrl } = useWardrobe()
+  const [src, setSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    photoUrl(photoPath).then((url) => {
+      if (active) setSrc(url)
+    })
+    return () => {
+      active = false
+    }
+  }, [photoPath, photoUrl])
+
+  return (
+    <div className={`asset-cell ${selected ? 'on' : ''}`}>
+      <button type="button" className="asset-pick" onClick={onSelect} title={name}>
+        {src ? <img src={src} alt={name} /> : <span className="asset-loading">…</span>}
+        {selected ? <span className="asset-check">✓</span> : null}
+      </button>
+      {onDelete ? (
+        <button type="button" className="asset-del" onClick={onDelete} aria-label={`删除 ${name}`}>
+          ✕
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+export function ImagePicker({
+  mode,
+  category,
+  cartoonId,
+  customAssetId,
+  photoPreview,
+  customPreview,
+  busy,
+  onModeChange,
+  onCartoonChange,
+  onCustomAssetChange,
+  onPhotoPick,
+  onPhotoRemove,
+  onCustomFilePick
+}: {
+  mode: ImageMode
+  category: Category
+  cartoonId: string | null
+  customAssetId: string | null
+  photoPreview: string | null
+  customPreview: string | null
+  busy?: boolean
+  onModeChange: (mode: ImageMode) => void
+  onCartoonChange: (id: string | null) => void
+  onCustomAssetChange: (id: string | null) => void
+  onPhotoPick: (file: File) => void
+  onPhotoRemove?: () => void
+  /** 自定义图片在这里已经压缩过了，传进来的是 Blob */
+  onCustomFilePick: (blob: Blob, name: string) => void
+}) {
+  const { customAssets, deleteCustomAsset } = useWardrobe()
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const albumRef = useRef<HTMLInputElement>(null)
+  const customRef = useRef<HTMLInputElement>(null)
+  const [tab, setTab] = useState<Category>(category)
+  const [compressing, setCompressing] = useState(false)
+
+  // 衣服分类变了，卡通库的默认分类跟着变
+  useEffect(() => {
+    setTab(category)
+  }, [category])
+
+  const assets = listCartoonAssets(tab)
+  const selectedAsset = customAssets.find((asset) => asset.id === customAssetId) ?? null
+
+  async function handleCustomFile(file: File | undefined) {
+    if (!file) return
+    setCompressing(true)
+    try {
+      const compressed = await compressImage(file)
+      const name = file.name.replace(/\.[^.]+$/, '').slice(0, 20) || '自定义图片'
+      onCustomFilePick(compressed, name)
+    } finally {
+      setCompressing(false)
+    }
+  }
+
+  return (
+    <div className="field">
+      <span className="field-label">图片显示方式</span>
+
+      <div className="mode-picker">
+        {IMAGE_MODES.map((item) => {
+          const meta = IMAGE_MODE_META[item]
+          return (
+            <button
+              type="button"
+              key={item}
+              className={`mode-btn ${mode === item ? 'on' : ''}`}
+              onClick={() => onModeChange(item)}
+            >
+              <span className="mode-emoji" aria-hidden>
+                {meta.emoji}
+              </span>
+              <span className="mode-label">{meta.label}</span>
+              <span className="mode-hint">{meta.hint}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ---------- 真实照片 ---------- */}
+      {mode === 'photo' ? (
+        <div className="photo-picker">
+          <button
+            type="button"
+            className="photo-drop"
+            onClick={() => (photoPreview ? albumRef.current?.click() : cameraRef.current?.click())}
+          >
+            {compressing ? (
+              <span className="hint">
+                <span className="big">⏳</span>
+                正在压缩照片…
+              </span>
+            ) : photoPreview ? (
+              <img src={photoPreview} alt="衣服预览" />
+            ) : (
+              <span className="hint">
+                <span className="big">📷</span>
+                点击拍照或从相册选择
+              </span>
+            )}
+          </button>
+          <div className="photo-actions">
+            <button type="button" className="btn small" onClick={() => cameraRef.current?.click()}>
+              拍照
+            </button>
+            <button type="button" className="btn small" onClick={() => albumRef.current?.click()}>
+              相册
+            </button>
+            {photoPreview && onPhotoRemove ? (
+              <button type="button" className="btn small ghost" onClick={onPhotoRemove}>
+                移除照片
+              </button>
+            ) : null}
+          </div>
+          <p className="note">上传后这件衣服就显示你的真实照片，不会再显示卡通图。</p>
+        </div>
+      ) : null}
+
+      {/* ---------- 卡通图片 ---------- */}
+      {mode === 'cartoon' ? (
+        <div className="cartoon-picker">
+          <div className="sub-head">
+            <span>我的自定义图片</span>
+            <button type="button" className="btn small ghost" onClick={() => customRef.current?.click()}>
+              ＋ 上传自定义图片
+            </button>
+          </div>
+
+          {customPreview ? (
+            <div className="custom-preview">
+              <img src={customPreview} alt="自定义图片预览" />
+              <div className="stack" style={{ gap: 8 }}>
+                <span className="note">已选择新上传的自定义图片，保存后生效。</span>
+                <button
+                  type="button"
+                  className="btn small ghost"
+                  onClick={() => onCustomAssetChange(null)}
+                >
+                  取消选择
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {customAssets.length ? (
+            <div className="asset-grid">
+              {customAssets.map((asset) => (
+                <AssetThumb
+                  key={asset.id}
+                  photoPath={asset.photoPath}
+                  name={asset.name}
+                  selected={asset.id === customAssetId}
+                  onSelect={() => onCustomAssetChange(asset.id)}
+                  onDelete={() => {
+                    if (confirm(`删除自定义图片「${asset.name}」？用它的衣服会回到默认卡通图。`)) {
+                      void deleteCustomAsset(asset.id)
+                      if (customAssetId === asset.id) onCustomAssetChange(null)
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="note">还没有自定义图片。可以从相册上传一张自己的卡通图。</p>
+          )}
+
+          {selectedAsset ? (
+            <button type="button" className="btn small ghost" onClick={() => onCustomAssetChange(null)}>
+              ↩ 恢复默认卡通图
+            </button>
+          ) : null}
+
+          <div className="sub-head">
+            <span>内置卡通素材库</span>
+          </div>
+          <div className="chips" role="tablist" aria-label="卡通素材分类">
+            {CATEGORIES.map((item) => (
+              <button
+                type="button"
+                key={item}
+                role="tab"
+                aria-selected={tab === item}
+                className={`chip ${tab === item ? 'active' : ''}`}
+                onClick={() => setTab(item)}
+              >
+                {CATEGORY_META[item].emoji} {CATEGORY_META[item].label}
+              </button>
+            ))}
+          </div>
+
+          <div className="cartoon-grid">
+            {assets.map((asset) => {
+              const uri = cartoonDataUri(asset.id)
+              return (
+                <button
+                  type="button"
+                  key={asset.id}
+                  className={`cartoon-cell ${cartoonId === asset.id ? 'on' : ''}`}
+                  onClick={() => onCartoonChange(asset.id)}
+                  title={asset.name}
+                >
+                  {uri ? <img src={uri} alt={asset.name} /> : null}
+                  {cartoonId === asset.id ? <span className="cell-check">✓</span> : null}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="color-legend">
+            可选颜色：
+            {CARTOON_COLORS.map((color) => (
+              <span key={color.id} className="legend-dot" title={color.name}>
+                <i style={{ background: color.hex }} />
+                {color.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ---------- 隐藏图片 ---------- */}
+      {mode === 'hidden' ? (
+        <div className="hidden-hint">
+          <div className="photo-hidden preview">
+            <img
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><path d="M50 16a9 9 0 1 1 9 9c-3.5 1.2-6 3.8-6 7v3" fill="none" stroke="#BCB3A2" stroke-width="3.5" stroke-linecap="round"/><path d="M16 76 L50 33 L84 76 Z" fill="none" stroke="#BCB3A2" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg>'
+              )}`}
+              alt=""
+              aria-hidden
+            />
+          </div>
+          <p className="note">
+            列表和详情页只显示编号、名称、分类和洗涤状态。
+            你上传的真实照片和卡通图设置都会保留，以后随时可以切回来。
+          </p>
+        </div>
+      ) : null}
+
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onPhotoPick(file)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={albumRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onPhotoPick(file)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={customRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void handleCustomFile(file)
+          e.target.value = ''
+        }}
+      />
+      {busy ? <span className="note">保存中…</span> : null}
+    </div>
+  )
+}
