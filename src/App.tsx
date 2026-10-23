@@ -8,6 +8,7 @@ import { HomePage } from './pages/HomePage'
 import { LaundryPage } from './pages/LaundryPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SharePage } from './pages/SharePage'
 import { WardrobePage } from './pages/WardrobePage'
 import { useWardrobe } from './store/wardrobe'
 
@@ -15,6 +16,7 @@ export function App() {
   const { ready, error, dismissError } = useWardrobe()
   const location = useLocation()
   const [showError, setShowError] = useState(false)
+  const isShare = location.pathname.startsWith('/s/')
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -24,7 +26,7 @@ export function App() {
     setShowError(Boolean(error))
   }, [error])
 
-  if (!ready) {
+  if (!ready && !isShare) {
     return (
       <div className="loading-screen">
         <div className="spinner" />
@@ -35,8 +37,8 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <TabBar />
-      <main className="app-main">
+      {isShare ? null : <TabBar />}
+      <main className={isShare ? 'app-main share-main' : 'app-main'}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/wardrobe" element={<WardrobePage />} />
@@ -45,6 +47,7 @@ export function App() {
           <Route path="/add" element={<AddPage />} />
           <Route path="/item/:id" element={<DetailPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/s/:token" element={<SharePage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>

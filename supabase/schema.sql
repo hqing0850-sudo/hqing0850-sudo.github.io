@@ -202,5 +202,115 @@ create policy "photos_delete_own" on storage.objects
   );
 
 -- ============================================================
---  完成。回到应用里用邮箱注册账号，然后就能在手机和电脑之间同步了。
+--  7. 只读分享链接
+--  主人生成一个随机 token，别人拿链接就能看；
+--  撤销后立刻失效，分享出去的照片也会被删除。
+-- ============================================================
+
+create table if not exists public.wardrobe_shares (
+  token text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null default '我的衣橱',
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  revoked boolean not null default false
+);
+
+create index if not exists wardrobe_shares_user_idx
+  on public.wardrobe_shares (user_id, created_at desc);
+
+alter table public.wardrobe_shares enable row level security;
+
+drop policy if exists "shares_select_own" on public.wardrobe_shares;
+create policy "shares_select_own" on public.wardrobe_shares
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "shares_insert_own" on public.wardrobe_shares;
+create policy "shares_insert_own" on public.wardrobe_shares
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "shares_update_own" on public.wardrobe_shares;
+create policy "shares_update_own" on public.wardrobe_shares
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "shares_delete_own" on public.wardrobe_shares;
+create policy "shares_delete_own" on public.wardrobe_shares
+  for delete using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.wardrobe_shares to authenticated;
+
+-- 访客凭 token 读分享内容（不需要登录）
+create or replace function public.get_shared_wardrobe(p_token text)
+returns jsonb
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select payload
+    from public.wardrobe_shares
+   where token = p_token
+     and revoked = false
+   limit 1;
+$$;
+
+revoke all on function public.get_shared_wardrobe(text) from public;
+grant execute on function public.get_shared_wardrobe(text) to anon, authenticated;
+
+-- 分享用的照片桶：公开读，只有主人能往自己的 token 目录里写
+insert into storage.buckets (id, name, public)
+values ('shared', 'shared', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "shared_photos_select_own" on storage.objects;
+create policy "shared_photos_select_own" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'shared'
+    and exists (
+      select 1 from public.wardrobe_shares s
+       where s.token = (storage.foldername(name))[1]
+         and s.user_id = auth.uid()
+         and not s.revoked
+    )
+  );
+
+drop policy if exists "shared_photos_insert_own" on storage.objects;
+create policy "shared_photos_insert_own" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'shared'
+    and exists (
+      select 1 from public.wardrobe_shares s
+       where s.token = (storage.foldername(name))[1]
+         and s.user_id = auth.uid()
+         and not s.revoked
+    )
+  );
+
+drop policy if exists "shared_photos_update_own" on storage.objects;
+create policy "shared_photos_update_own" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'shared'
+    and exists (
+      select 1 from public.wardrobe_shares s
+       where s.token = (storage.foldername(name))[1]
+         and s.user_id = auth.uid()
+         and not s.revoked
+    )
+  );
+
+drop policy if exists "shared_photos_delete_own" on storage.objects;
+create policy "shared_photos_delete_own" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'shared'
+    and exists (
+      select 1 from public.wardrobe_shares s
+       where s.token = (storage.foldername(name))[1]
+         and s.user_id = auth.uid()
+    )
+  );
+
+-- ============================================================
+--  完成。回到应用里用邮箱注册账号，然后就能在手机和电脑之间同步，
+--  并在「设置 → 分享衣橱」生成只读链接。
 -- ============================================================

@@ -47,6 +47,7 @@ interface WardrobeState {
   loading: boolean
   error: string | null
   config: SupabaseConfig | null
+  client: SupabaseClient | null
   session: Session | null
   cloudBusy: boolean
   defaultImageMode: ImageMode
@@ -349,6 +350,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       config,
+      client,
       session,
       cloudBusy,
       defaultImageMode,
@@ -383,6 +385,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       config,
+      client,
       session,
       cloudBusy,
       defaultImageMode,

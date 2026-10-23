@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Toast } from '../components/Toast'
 import { createLocalRepository, findCodeMismatches } from '../data/localRepository'
+import { createShare, listShares, revokeShare, type ShareRecord } from '../data/shares'
 import { formatCode, maxSequenceFromCodes, smallestFreeSequence, usedSequences } from '../lib/numbering'
 import { usePwaInstall } from '../lib/pwa'
 import { useWardrobe } from '../store/wardrobe'
@@ -32,6 +33,7 @@ export function SettingsPage() {
   const {
     mode,
     config,
+    client,
     session,
     garments,
     logs,
@@ -48,7 +50,8 @@ export function SettingsPage() {
     customAssets,
     createCustomAsset,
     deleteCustomAsset,
-    refresh
+    refresh,
+    photoUrl
   } = useWardrobe()
   const [url, setUrl] = useState(config?.url ?? '')
   const [anonKey, setAnonKey] = useState(config?.anonKey ?? '')
@@ -58,6 +61,9 @@ export function SettingsPage() {
   const [includePhotos, setIncludePhotos] = useState(true)
   const [toast, setToast] = useState<{ message: string; tone: Tone } | null>(null)
   const [localCount, setLocalCount] = useState<number | null>(null)
+  const [shares, setShares] = useState<ShareRecord[]>([])
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareProgress, setShareProgress] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const assetRef = useRef<HTMLInputElement>(null)
   const { canInstall, install, standalone } = usePwaInstall()
@@ -95,6 +101,25 @@ export function SettingsPage() {
       active = false
     }
   }, [mode, refresh])
+
+  // 已登录云端时，读取自己生成过的分享链接
+  useEffect(() => {
+    if (!client || !session) {
+      setShares([])
+      return
+    }
+    let active = true
+    listShares(client, session.user.id)
+      .then((list) => {
+        if (active) setShares(list)
+      })
+      .catch(() => {
+        if (active) setShares([])
+      })
+    return () => {
+      active = false
+    }
+  }, [client, session, refresh])
 
   function notify(message: string, tone: Tone = 'info') {
     setToast({ message, tone })
@@ -181,6 +206,54 @@ export function SettingsPage() {
       notify(error instanceof Error ? error.message : '上传失败', 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleCreateShare() {
+    if (!client || !session || !photoUrl) return
+    setShareBusy(true)
+    setShareProgress('正在准备…')
+    try {
+      const record = await createShare(
+        client,
+        session.user.id,
+        garments,
+        photoUrl,
+        `${session.user.email ? session.user.email.split('@')[0] : '我'}的衣橱`,
+        (done, total) => setShareProgress(`正在上传照片 ${done}/${total}`)
+      )
+      setShares((prev) => [record, ...prev])
+      await copyShareLink(record.token)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '生成分享失败', 'error')
+    } finally {
+      setShareBusy(false)
+      setShareProgress(null)
+    }
+  }
+
+  async function copyShareLink(token: string) {
+    const link = `${window.location.origin}/s/${token}`
+    try {
+      await navigator.clipboard.writeText(link)
+      notify('分享链接已复制，发给别人即可打开')
+    } catch {
+      window.prompt('复制这个链接发给别人：', link)
+    }
+  }
+
+  async function handleRevokeShare(token: string) {
+    if (!client) return
+    if (!confirm('撤销后这个链接会立刻失效，已上传的分享照片也会删除。确定撤销吗？')) return
+    setShareBusy(true)
+    try {
+      await revokeShare(client, token)
+      setShares((prev) => prev.filter((item) => item.token !== token))
+      notify('已撤销这个分享链接')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '撤销失败', 'error')
+    } finally {
+      setShareBusy(false)
     }
   }
 
@@ -385,6 +458,63 @@ export function SettingsPage() {
               </>
             ) : null}
           </div>
+        )}
+      </section>
+
+      {/* ---------- 分享衣橱 ---------- */}
+      <section className="panel">
+        <h3>🔗 分享衣橱（只读链接）</h3>
+        <p className="desc">
+          生成一个链接发给别人，对方不用注册、不用装 App，打开就能浏览你的衣橱，但<b>不能修改</b>。
+          别人也可以把自己的链接发给你，用同样的方式打开。撤销后链接立刻失效。
+        </p>
+        {mode === 'cloud' && client && session ? (
+          <div className="stack">
+            <div className="row between">
+              <span className="note">分享会包含当前全部 {garments.length} 件衣服和照片</span>
+            </div>
+            <button
+              className="btn small primary"
+              onClick={() => void handleCreateShare()}
+              disabled={busy || shareBusy}
+            >
+              {shareBusy ? shareProgress ?? '正在生成…' : '生成新的分享链接'}
+            </button>
+            {shares.length ? (
+              <div className="share-list">
+                {shares.map((item) => (
+                  <div key={item.token} className="share-item">
+                    <div className="row between">
+                      <b>{item.title}</b>
+                      <span className="note">
+                        {new Date(item.createdAt).toLocaleDateString('zh-CN')} · {item.count} 件
+                      </span>
+                    </div>
+                    <div className="link">{`${window.location.origin}/s/${item.token}`}</div>
+                    <div className="row wrap">
+                      <button className="btn small" onClick={() => void copyShareLink(item.token)}>
+                        复制链接
+                      </button>
+                      <a className="btn small ghost" href={`/s/${item.token}`} target="_blank" rel="noreferrer">
+                        预览
+                      </a>
+                      <button
+                        className="btn small danger"
+                        onClick={() => void handleRevokeShare(item.token)}
+                        disabled={shareBusy}
+                      >
+                        撤销
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="note">还没有分享链接。生成后可以把链接发到微信或短信里。</p>
+            )}
+          </div>
+        ) : (
+          <p className="note">先在上一栏登录云端账号，才能生成分享链接。</p>
         )}
       </section>
 
