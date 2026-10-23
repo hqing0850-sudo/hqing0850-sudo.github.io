@@ -26,12 +26,15 @@ begin
     raise exception '请先登录';
   end if;
 
-  prefix := case p_category
-    when 'top' then '上衣'
-    when 'outerwear' then '外套'
-    when 'pants' then '裤子'
-    else raise exception '未知分类: %', p_category
-  end;
+  if p_category = 'top' then
+    prefix := '上衣';
+  elsif p_category = 'outerwear' then
+    prefix := '外套';
+  elsif p_category = 'pants' then
+    prefix := '裤子';
+  else
+    raise exception '未知分类: %', p_category;
+  end if;
 
   -- 从 1 开始找第一个没有被任何衣服占用的编号
   select g into candidate
@@ -148,14 +151,6 @@ drop policy if exists "wash_logs_delete_own" on public.wash_logs;
 create policy "wash_logs_delete_own" on public.wash_logs
   for delete using (auth.uid() = user_id);
 
-drop policy if exists "counters_select_own" on public.garment_counters;
-drop policy if exists "counters_insert_own" on public.garment_counters;
-drop policy if exists "counters_update_own" on public.garment_counters;
-drop policy if exists "used_codes_select_own" on public.garment_used_codes;
-drop policy if exists "used_codes_insert_own" on public.garment_used_codes;
-drop policy if exists "used_codes_update_own" on public.garment_used_codes;
-drop policy if exists "used_codes_delete_own" on public.garment_used_codes;
-
 drop policy if exists "assets_select_own" on public.custom_assets;
 create policy "assets_select_own" on public.custom_assets
   for select using (auth.uid() = user_id);
@@ -171,6 +166,12 @@ create policy "assets_update_own" on public.custom_assets
 drop policy if exists "assets_delete_own" on public.custom_assets;
 create policy "assets_delete_own" on public.custom_assets
   for delete using (auth.uid() = user_id);
+
+-- 表权限：行级安全（RLS）负责“能看哪些行”，GRANT 负责“能不能碰这张表”
+grant select, insert, update, delete on public.garments to authenticated;
+grant select, insert, update, delete on public.wash_logs to authenticated;
+grant select, insert, update, delete on public.custom_assets to authenticated;
+grant execute on function public.next_garment_sequence(text) to authenticated;
 
 -- ---------- 6. 照片存储桶（私有，只能本人访问） ----------
 insert into storage.buckets (id, name, public)
