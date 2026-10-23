@@ -219,7 +219,7 @@ export function SettingsPage() {
         session.user.id,
         garments,
         photoUrl,
-        `${session.user.email ? session.user.email.split('@')[0] : '我'}的衣橱`,
+        '我的衣橱',
         (done, total) => setShareProgress(`正在上传照片 ${done}/${total}`)
       )
       setShares((prev) => [record, ...prev])
