@@ -21,7 +21,7 @@ const STATUS_ORDER: Record<string, number> = {
 }
 
 export function WardrobePage() {
-  const { garments } = useWardrobe()
+  const { garments, mode, ready } = useWardrobe()
   const navigate = useNavigate()
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
@@ -61,6 +61,15 @@ export function WardrobePage() {
           ＋ 新增
         </button>
       </header>
+
+      {ready && mode === 'local' ? (
+        <div className="login-hint">
+          <span>当前显示的是这台手机的本机数据，家人看不到。登录家庭账号后，大家共用同一个衣橱。</span>
+          <button className="btn small primary" onClick={() => navigate('/settings')}>
+            去登录
+          </button>
+        </div>
+      ) : null}
 
       <div className="search">
         <span className="glass" aria-hidden>

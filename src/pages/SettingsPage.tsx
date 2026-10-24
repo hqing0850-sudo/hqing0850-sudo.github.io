@@ -11,6 +11,9 @@ import type { ExportBundle } from '../types'
 
 type Tone = 'info' | 'error'
 
+/** 记住家庭账号邮箱，之后每台设备只需要输家庭码 */
+const REMEMBER_EMAIL_KEY = 'wardrobe.familyEmail'
+
 function CustomAssetThumb({ photoPath, name }: { photoPath: string; name: string }) {
   const { photoUrl } = useWardrobe()
   const [src, setSrc] = useState<string | null>(null)
@@ -40,8 +43,8 @@ export function SettingsPage() {
     connectCloud,
     disconnectCloud,
     signIn,
-    signUp,
     signOut,
+    updatePassword,
     exportData,
     importData,
     migrateLocalToCloud,
@@ -55,7 +58,13 @@ export function SettingsPage() {
   } = useWardrobe()
   const [url, setUrl] = useState(config?.url ?? '')
   const [anonKey, setAnonKey] = useState(config?.anonKey ?? '')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem(REMEMBER_EMAIL_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [includePhotos, setIncludePhotos] = useState(true)
@@ -136,13 +145,18 @@ export function SettingsPage() {
 
   async function handleSignIn() {
     if (!email.trim() || !password) {
-      notify('请填写邮箱和密码', 'error')
+      notify('请填写邮箱和家庭码', 'error')
       return
     }
     setBusy(true)
     try {
       await signIn(email.trim(), password)
-      notify('登录成功，正在读取云端数据…')
+      try {
+        localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim())
+      } catch {
+        // 记不住邮箱也不影响本次登录
+      }
+      notify('登录成功，正在读取家庭衣橱…')
       await refresh()
     } catch (error) {
       notify(error instanceof Error ? error.message : '登录失败', 'error')
@@ -151,18 +165,19 @@ export function SettingsPage() {
     }
   }
 
-  async function handleSignUp() {
-    if (!email.trim() || !password) {
-      notify('请填写邮箱和密码', 'error')
+  async function handleChangeCode() {
+    const next = window.prompt('设置新的家庭码（至少 8 位，建议字母+数字）：')
+    if (!next) return
+    if (next.length < 8) {
+      notify('家庭码至少 8 位', 'error')
       return
     }
     setBusy(true)
     try {
-      await signUp(email.trim(), password)
-      notify('注册成功，已自动登录')
-      await refresh()
+      await updatePassword(next)
+      notify('家庭码已修改，记得告诉家人新码')
     } catch (error) {
-      notify(error instanceof Error ? error.message : '注册失败', 'error')
+      notify(error instanceof Error ? error.message : '修改失败', 'error')
     } finally {
       setBusy(false)
     }
@@ -341,9 +356,8 @@ export function SettingsPage() {
       <section className="panel">
         <h3>☁️ 云端同步（手机和电脑共用一个衣橱）</h3>
         <p className="desc">
-          填写 Supabase 的「项目地址」和「anon public 密钥」，再用同一个邮箱账号登录，
-          手机和电脑就能看到同一批衣服。只有 anon public 密钥会进入前端代码，这是安全的；
-          数据库密码和 service_role 密钥绝对不要填进来。
+          这是<b>家庭共用衣橱</b>：全家人用同一个账号登录，谁添加或修改，其他人刷新就能看到。
+          账号已经建好，你只需要输入邮箱和家庭码；家庭码就是登录密码，只发给家人。
         </p>
 
         {mode === 'cloud' && session ? (
@@ -355,6 +369,9 @@ export function SettingsPage() {
             <div className="row wrap">
               <button className="btn small" onClick={() => void refresh()} disabled={busy}>
                 立即同步
+              </button>
+              <button className="btn small" onClick={() => void handleChangeCode()} disabled={busy}>
+                修改家庭码
               </button>
               <button className="btn small" onClick={() => void handleSignOut()} disabled={busy}>
                 退出账号
@@ -381,40 +398,43 @@ export function SettingsPage() {
           </div>
         ) : (
           <div className="stack">
-            <div className="field">
-              <label htmlFor="s-url">项目地址</label>
-              <input
-                id="s-url"
-                className="input"
-                value={url}
-                placeholder="https://xxxxx.supabase.co"
-                autoComplete="off"
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="s-key">anon public 密钥</label>
-              <input
-                id="s-key"
-                className="input"
-                value={anonKey}
-                placeholder="eyJhbGciOi..."
-                autoComplete="off"
-                onChange={(e) => setAnonKey(e.target.value)}
-              />
-            </div>
-            <button className="btn small primary" onClick={() => handleSaveConfig()} disabled={busy}>
-              保存云端配置
-            </button>
-
             {config ? (
-              <div className="divider" />
-            ) : null}
+              <p className="note">已连接家庭云端衣橱（配置已内置，不需要填写）。</p>
+            ) : (
+              <>
+                <div className="field">
+                  <label htmlFor="s-url">项目地址</label>
+                  <input
+                    id="s-url"
+                    className="input"
+                    value={url}
+                    placeholder="https://xxxxx.supabase.co"
+                    autoComplete="off"
+                    onChange={(e) => setUrl(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="s-key">anon public 密钥</label>
+                  <input
+                    id="s-key"
+                    className="input"
+                    value={anonKey}
+                    placeholder="eyJhbGciOi..."
+                    autoComplete="off"
+                    onChange={(e) => setAnonKey(e.target.value)}
+                  />
+                </div>
+                <button className="btn small primary" onClick={() => handleSaveConfig()} disabled={busy}>
+                  保存云端配置
+                </button>
+                <div className="divider" />
+              </>
+            )}
 
             {config ? (
               <>
                 <div className="field">
-                  <label htmlFor="s-email">邮箱</label>
+                  <label htmlFor="s-email">邮箱（第一次填，之后会记住）</label>
                   <input
                     id="s-email"
                     className="input"
@@ -426,35 +446,30 @@ export function SettingsPage() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="s-password">密码</label>
+                  <label htmlFor="s-password">家庭码（就是登录密码）</label>
                   <input
                     id="s-password"
                     className="input"
                     type="password"
                     value={password}
-                    placeholder="至少 6 位"
+                    placeholder="至少 8 位"
                     autoComplete="current-password"
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
                 <div className="row wrap">
                   <button className="btn small primary" onClick={() => void handleSignIn()} disabled={busy}>
-                    登录
-                  </button>
-                  <button className="btn small" onClick={() => void handleSignUp()} disabled={busy}>
-                    注册新账号
+                    进入家庭衣橱
                   </button>
                   <button
                     className="btn small ghost"
                     onClick={() => navigate('/reset-password')}
                     disabled={busy}
                   >
-                    忘记密码？
+                    忘记家庭码？
                   </button>
                 </div>
-                <p className="note">
-                  手机和电脑请填同样的地址和密钥，再用同一个邮箱账号登录。
-                </p>
+                <p className="note">家庭码只发给家人；登录后可以在上面点「修改家庭码」。</p>
               </>
             ) : null}
           </div>

@@ -1804,3 +1804,22 @@ a {
   text-decoration: underline;
 }
 
+
+.login-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #f6e9c8;
+  color: #7a5b12;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.login-hint .btn {
+  flex-shrink: 0;
+}
+
