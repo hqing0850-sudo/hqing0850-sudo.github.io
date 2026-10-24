@@ -50,12 +50,21 @@ export const IMAGE_MODE_META: Record<ImageMode, { label: string; emoji: string; 
   hidden: { label: '隐藏图片', emoji: '🚫', hint: '不显示图片，只看编号和状态' }
 }
 
+/** 一个衣柜（爸爸/妈妈/我…），id 永远不会变，改名只改 name */
+export interface Member {
+  id: string
+  name: string
+  sortOrder?: number
+}
+
 export interface Garment {
   id: string
   code: string
   category: Category
-  /** 归属：爸爸 / 妈妈 / 我 … 可自定义，空字符串表示未分类 */
+  /** 归属衣柜的显示名（缓存，改名时会同步更新） */
   member: string
+  /** 归属衣柜的内部编号，改名不变 */
+  memberId: string | null
   name: string
   color: string
   seasons: Season[]
@@ -99,7 +108,9 @@ export interface WashLog {
 
 export type NewGarmentInput = {
   category: Category
-  /** 归属（可选；老数据/测试里可能没有） */
+  /** 归属衣柜的内部编号 */
+  memberId?: string | null
+  /** 归属衣柜的显示名（可选；老数据/测试里可能没有） */
   member?: string
   name: string
   color: string
@@ -119,6 +130,7 @@ export type GarmentPatch = Partial<
     | 'color'
     | 'category'
     | 'member'
+    | 'memberId'
     | 'seasons'
     | 'thickness'
     | 'notes'

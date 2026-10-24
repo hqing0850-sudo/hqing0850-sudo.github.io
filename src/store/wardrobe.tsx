@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { createLocalRepository } from '../data/localRepository'
-import { allMembers, rememberMember } from '../lib/members'
 import {
   createCloudRepository,
   createSupabaseClient,
@@ -16,6 +15,7 @@ import type {
   Garment,
   GarmentPatch,
   ImageMode,
+  Member,
   NewGarmentInput,
   WashLog,
   WashStatus
@@ -52,12 +52,14 @@ interface WardrobeState {
   session: Session | null
   cloudBusy: boolean
   defaultImageMode: ImageMode
-  /** 当前正在看的衣柜：'__all__' 全部 / 成员名字 / '__none__' 未分类 */
+  /** 当前正在看的衣柜：'__all__' 全部 / 衣柜内部编号 / '__none__' 未分类 */
   activeMember: string
-  /** 当前可用衣柜名单（默认成员 + 衣服里出现过的自定义名字） */
-  members: string[]
-  setActiveMember: (name: string) => void
-  addMember: (name: string) => void
+  /** 当前账号的衣柜名单 */
+  members: Member[]
+  setActiveMember: (id: string) => void
+  addMember: (name: string) => Promise<Member>
+  renameMember: (id: string, name: string) => Promise<void>
+  deleteMember: (id: string, deleteClothes: boolean) => Promise<{ deleted: number; photos: string[] }>
   refresh: () => Promise<void>
   createGarment: (input: NewGarmentInput) => Promise<Garment>
   updateGarment: (id: string, patch: GarmentPatch, photo?: Blob | null) => Promise<void>
@@ -102,8 +104,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       return '__all__'
     }
   })
-  const [membersTick, setMembersTick] = useState(0)
-  const members = useMemo(() => allMembers(garments), [garments, membersTick])
+  const [members, setMembers] = useState<Member[]>([])
   const repoRef = useRef<WardrobeRepository>(createLocalRepository())
 
   const mode: Mode = client && session ? 'cloud' : 'local'
@@ -142,14 +143,20 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [nextGarments, nextLogs, nextAssets] = await Promise.all([
+      const [nextGarments, nextLogs, nextAssets, nextMembers] = await Promise.all([
         repoRef.current.listGarments(),
         repoRef.current.listLogs(),
-        repoRef.current.listCustomAssets()
+        repoRef.current.listCustomAssets(),
+        repoRef.current.listMembers()
       ])
       setGarments(nextGarments)
       setLogs(nextLogs)
       setCustomAssets(nextAssets)
+      setMembers(nextMembers)
+      setActiveMemberState((prev) => {
+        if (prev === '__all__' || prev === '__none__') return prev
+        return nextMembers.some((m) => m.id === prev) ? prev : '__all__'
+      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '读取数据失败')
@@ -221,14 +228,38 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addMember = useCallback(
-    (raw: string) => {
+    async (raw: string) => {
       const name = raw.trim()
-      if (!name) return
-      rememberMember(name)
-      setMembersTick((n) => n + 1)
-      setActiveMember(name)
+      if (!name) throw new Error('名字不能为空')
+      const member = await repoRef.current.createMember(name)
+      setMembers((prev) => {
+        const rest = prev.filter((m) => m.id !== member.id)
+        return [...rest, member].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      })
+      setActiveMember(member.id)
+      return member
     },
     [setActiveMember]
+  )
+
+  const renameMember = useCallback(async (id: string, name: string) => {
+    const nextName = name.trim()
+    await repoRef.current.renameMember(id, nextName)
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, name: nextName } : m)))
+    setGarments((prev) => prev.map((g) => (g.memberId === id ? { ...g, member: nextName } : g)))
+  }, [])
+
+  const deleteMember = useCallback(
+    async (id: string, deleteClothes: boolean) => {
+      const result = await repoRef.current.deleteMember(id, deleteClothes)
+      setMembers((prev) => prev.filter((m) => m.id !== id))
+      if (deleteClothes) {
+        setGarments((prev) => prev.filter((g) => g.memberId !== id))
+      }
+      setActiveMemberState((prev) => (prev === id ? '__all__' : prev))
+      return result
+    },
+    []
   )
 
   const connectCloud = useCallback((next: SupabaseConfig) => {
@@ -394,6 +425,8 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       members,
       setActiveMember,
       addMember,
+      renameMember,
+      deleteMember,
       refresh,
       createGarment,
       updateGarment,
@@ -433,6 +466,8 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       members,
       setActiveMember,
       addMember,
+      renameMember,
+      deleteMember,
       refresh,
       createGarment,
       updateGarment,

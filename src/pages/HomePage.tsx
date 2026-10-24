@@ -7,14 +7,14 @@ import { CATEGORIES, CATEGORY_META, WASH_STATUS_META } from '../types'
 import { relativeTime } from '../lib/format'
 
 export function HomePage() {
-  const { garments, logs, mode, activeMember } = useWardrobe()
+  const { garments, logs, mode, activeMember, members } = useWardrobe()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<string>('all')
 
   const scoped = useMemo(() => {
     if (activeMember === '__all__') return garments
-    if (activeMember === '__none__') return garments.filter((g) => !g.member)
-    return garments.filter((g) => g.member === activeMember)
+    if (activeMember === '__none__') return garments.filter((g) => !g.memberId)
+    return garments.filter((g) => g.memberId === activeMember)
   }, [garments, activeMember])
 
   const stats = useMemo(() => {
@@ -59,7 +59,7 @@ export function HomePage() {
               ? '衣橱概览'
               : activeMember === '__none__'
                 ? '未分类的衣服'
-                : `${activeMember}的衣柜`}
+                : `${members.find((m) => m.id === activeMember)?.name ?? '全部'}的衣柜`}
           </h1>
           <p className="sub">
             共 {stats.total} 件衣服 · {mode === 'cloud' ? '已同步到云端' : '保存在本机'}
@@ -137,7 +137,7 @@ export function HomePage() {
           <p>
             {activeMember === '__all__'
               ? '拍下第一件衣服，它会自动获得一个编号。'
-              : `点下面添加，衣服会自动归到「${activeMember === '__none__' ? '未分类' : activeMember}」。`}
+              : `点下面添加，衣服会自动归到「${activeMember === '__none__' ? '未分类' : members.find((m) => m.id === activeMember)?.name ?? '当前衣柜'}」。`}
           </p>
           <button className="btn primary" onClick={() => navigate('/add')}>
             ＋ 添加第一件衣服

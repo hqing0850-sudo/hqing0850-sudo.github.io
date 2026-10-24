@@ -34,7 +34,7 @@ function ShareThumb({ token, garment }: { token: string; garment: SharedGarment 
 export function SharePage() {
   const { token = '' } = useParams()
   const navigate = useNavigate()
-  const { mode, garments: myGarments, createGarment } = useWardrobe()
+  const { mode, garments: myGarments, createGarment, members, addMember } = useWardrobe()
   const [payload, setPayload] = useState<SharePayload | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -100,6 +100,7 @@ export function SharePage() {
     let added = 0
     let skipped = 0
     let failed = 0
+    const memberIdByName = new Map(members.map((m) => [m.name, m.id]))
     for (let i = 0; i < items.length; i += 1) {
       const g = items[i]
       setProgress(`正在导入 ${i + 1}/${items.length}`)
@@ -123,9 +124,21 @@ export function SharePage() {
         }
       }
       try {
+        const memberName = (g.member ?? '').trim()
+        let memberId: string | null = null
+        if (memberName) {
+          let id = memberIdByName.get(memberName)
+          if (!id) {
+            const created = await addMember(memberName)
+            id = created.id
+            memberIdByName.set(memberName, id)
+          }
+          memberId = id
+        }
         await createGarment({
           category: g.category,
-          member: g.member ?? '',
+          member: memberName,
+          memberId,
           name: g.name,
           color: g.color,
           seasons: g.seasons,

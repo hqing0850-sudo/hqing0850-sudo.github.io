@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryChips, GarmentCard, StatusFilterChips, useFilteredGarments } from '../components/GarmentCard'
-import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
 import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
 import { CATEGORIES } from '../types'
-import type { Garment } from '../types'
 
 type SortKey = 'newest' | 'code' | 'status'
 
@@ -24,20 +22,17 @@ const STATUS_ORDER: Record<string, number> = {
 }
 
 export function WardrobePage() {
-  const { garments, mode, ready, activeMember, deleteGarment } = useWardrobe()
+  const { garments, mode, ready, activeMember, members } = useWardrobe()
   const navigate = useNavigate()
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('newest')
-  const [pendingDelete, setPendingDelete] = useState<Garment | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
 
   const scoped = useMemo(() => {
     if (activeMember === '__all__') return garments
-    if (activeMember === '__none__') return garments.filter((g) => !g.member)
-    return garments.filter((g) => g.member === activeMember)
+    if (activeMember === '__none__') return garments.filter((g) => !g.memberId)
+    return garments.filter((g) => g.memberId === activeMember)
   }, [garments, activeMember])
 
   const filtered = useFilteredGarments(scoped, category, status, query)
@@ -58,20 +53,6 @@ export function WardrobePage() {
     return base
   }, [scoped])
 
-  async function handleDelete() {
-    if (!pendingDelete) return
-    setDeleting(true)
-    try {
-      await deleteGarment(pendingDelete.id)
-      setToast({ message: `已删除 ${pendingDelete.code}`, tone: 'info' })
-      setPendingDelete(null)
-    } catch (error) {
-      setToast({ message: error instanceof Error ? error.message : '删除失败', tone: 'error' })
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   return (
     <>
       <header className="page-head">
@@ -81,7 +62,7 @@ export function WardrobePage() {
               ? '我的衣服'
               : activeMember === '__none__'
                 ? '未分类'
-                : `${activeMember}的衣柜`}
+                : `${members.find((m) => m.id === activeMember)?.name ?? '全部'}的衣柜`}
           </h1>
           <p className="sub">
             {filtered.length === scoped.length
@@ -157,7 +138,7 @@ export function WardrobePage() {
             {scoped.length === 0
               ? activeMember === '__all__'
                 ? '拍照录入第一件，系统会自动编号。'
-                : `点下面添加，会自动归到「${activeMember === '__none__' ? '未分类' : activeMember}」。`
+                : `点下面添加，会自动归到「${activeMember === '__none__' ? '未分类' : members.find((m) => m.id === activeMember)?.name ?? '当前衣柜'}」。`
               : '换个筛选条件或关键词试试。'}
           </p>
           {scoped.length === 0 ? (
@@ -169,7 +150,7 @@ export function WardrobePage() {
       ) : (
         <div className="grid">
           {sorted.map((garment) => (
-            <GarmentCard key={garment.id} garment={garment} onDelete={setPendingDelete} />
+            <GarmentCard key={garment.id} garment={garment} />
           ))}
         </div>
       )}
@@ -180,37 +161,6 @@ export function WardrobePage() {
         </button>
       ) : null}
 
-      {pendingDelete ? (
-        <div
-          className="share-overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => {
-            if (!deleting) setPendingDelete(null)
-          }}
-        >
-          <div className="share-sheet confirm-sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="confirm-body">
-              <h2>确定删除 {pendingDelete.code}？</h2>
-              <p className="note">
-                删除后照片和洗涤记录会一起移除，编号会作废，不能再恢复。
-              </p>
-              <div className="confirm-actions">
-                <button className="btn" onClick={() => setPendingDelete(null)} disabled={deleting}>
-                  否，取消
-                </button>
-                <button className="btn danger" onClick={() => void handleDelete()} disabled={deleting}>
-                  {deleting ? '删除中…' : '是，删除'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {toast ? (
-        <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} />
-      ) : null}
     </>
   )
 }

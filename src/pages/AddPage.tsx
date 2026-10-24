@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { GarmentForm, emptyFormValue, toInput, type GarmentFormValue } from '../components/GarmentForm'
 import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
-import { allMembers, rememberMember } from '../lib/members'
 
 export function AddPage() {
   const navigate = useNavigate()
-  const { garments, createGarment, createCustomAsset, defaultImageMode, activeMember } = useWardrobe()
+  const { members, createGarment, createCustomAsset, defaultImageMode, activeMember, addMember } =
+    useWardrobe()
   const [value, setValue] = useState<GarmentFormValue>(() => ({
     ...emptyFormValue(defaultImageMode),
-    member: activeMember === '__all__' || activeMember === '__none__' ? '' : activeMember
+    member:
+      activeMember === '__all__' || activeMember === '__none__'
+        ? ''
+        : members.find((m) => m.id === activeMember)?.name ?? ''
   }))
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
@@ -31,8 +34,14 @@ export function AddPage() {
       }
 
       const input = toInput(value)
-      rememberMember(input.member ?? '')
-      const created = await createGarment({ ...input, customAssetId })
+      const memberName = (input.member ?? '').trim()
+      let memberId: string | null = null
+      if (memberName) {
+        const existing = members.find((m) => m.name === memberName)
+        const member = existing ?? (await addMember(memberName))
+        memberId = member.id
+      }
+      const created = await createGarment({ ...input, memberId, member: memberName, customAssetId })
       navigate(`/item/${created.id}`, { replace: true, state: { created: created.code } })
     } catch (error) {
       setToast({ message: error instanceof Error ? error.message : '保存失败，请重试', tone: 'error' })
@@ -59,7 +68,7 @@ export function AddPage() {
           onChange={setValue}
           busy={busy}
           submitLabel="保存到衣橱"
-          memberOptions={allMembers(garments)}
+          memberOptions={members.map((m) => m.name)}
         />
       </form>
 

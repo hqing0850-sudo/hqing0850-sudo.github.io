@@ -5,6 +5,7 @@ import type {
   ExportBundle,
   Garment,
   GarmentPatch,
+  Member,
   NewGarmentInput,
   WashLog,
   WashStatus
@@ -16,6 +17,8 @@ const COLLECTION = 'local'
 const GARMENTS = 'garments'
 const LOGS = 'logs'
 const ASSETS = 'customAssets'
+const MEMBERS = 'members'
+const MEMBERS_SEEDED = 'membersSeeded'
 /** 图片的存放键：真实照片是 photo:<衣服id>，自定义素材是 custom:<素材id> */
 const PHOTO_PREFIX = 'photo:'
 const CUSTOM_PREFIX = 'custom:'
@@ -43,10 +46,59 @@ function normalizeGarment(garment: Garment): Garment {
   return {
     ...garment,
     member: garment.member ?? '',
+    memberId: garment.memberId ?? null,
     displayMode: garment.displayMode ?? 'photo',
     cartoonId: garment.cartoonId ?? null,
     customAssetId: garment.customAssetId ?? null
   }
+}
+
+async function readMembers(store: KeyValueStore): Promise<Member[]> {
+  const rows = await store.list<Member>(MEMBERS)
+  return rows
+    .map((row) => row.value)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+}
+
+/** 第一次使用本机模式时补上默认衣柜；之后删光了也不会自动补 */
+async function ensureMembers(store: KeyValueStore): Promise<Member[]> {
+  const members = await readMembers(store)
+  const seeded = await store.get<boolean>(COLLECTION, MEMBERS_SEEDED)
+  if (seeded) return members
+
+  const garments = await readGarments(store)
+  const names = ['爸爸', '妈妈', '我', ...garments.map((g) => g.member ?? '')]
+  const seen = new Set(members.map((m) => m.name))
+  let order = members.length
+  for (const raw of names) {
+    const name = raw.trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    order += 1
+    const member: Member = { id: newId(), name, sortOrder: order }
+    await store.set(MEMBERS, member.id, member)
+  }
+  await store.set(COLLECTION, MEMBERS_SEEDED, true)
+  return readMembers(store)
+}
+
+async function resolveMember(
+  store: KeyValueStore,
+  memberId: string | null | undefined,
+  memberName: string | undefined
+): Promise<{ id: string | null; name: string }> {
+  const members = await ensureMembers(store)
+  if (memberId) {
+    const found = members.find((m) => m.id === memberId)
+    if (found) return { id: found.id, name: found.name }
+  }
+  const name = (memberName ?? '').trim()
+  if (!name) return { id: null, name: '' }
+  const byName = members.find((m) => m.name === name)
+  if (byName) return { id: byName.id, name: byName.name }
+  const created: Member = { id: newId(), name, sortOrder: members.length + 1 }
+  await store.set(MEMBERS, created.id, created)
+  return { id: created.id, name: created.name }
 }
 
 async function readGarments(store: KeyValueStore): Promise<Garment[]> {
@@ -97,11 +149,13 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
         const photoPath = input.photo
           ? await storeImage(store, `${PHOTO_PREFIX}${id}`, input.photo)
           : null
+        const member = await resolveMember(store, input.memberId, input.member)
         const garment: Garment = {
           id,
           code,
           category: input.category,
-          member: input.member?.trim() ?? '',
+          member: member.name,
+          memberId: member.id,
           name: input.name.trim() || code,
           color: input.color.trim(),
           seasons: input.seasons,
@@ -149,9 +203,20 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
           )
         }
 
+        let member = { id: current.memberId, name: current.member }
+        if (patch.memberId !== undefined || patch.member !== undefined) {
+          member = await resolveMember(
+            store,
+            patch.memberId !== undefined ? patch.memberId : null,
+            patch.member !== undefined ? patch.member : current.member
+          )
+        }
+
         const next: Garment = {
           ...current,
           ...patch,
+          member: member.name,
+          memberId: member.id,
           code,
           photoPath,
           updatedAt: Date.now(),
@@ -227,6 +292,54 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
       const asset = await store.get<CustomAsset>(ASSETS, id)
       if (asset?.photoPath) await store.remove(COLLECTION, asset.photoPath)
       await store.remove(ASSETS, id)
+    },
+
+    async listMembers() {
+      return ensureMembers(store)
+    },
+
+    async createMember(name: string) {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('名字不能为空')
+      const members = await ensureMembers(store)
+      const existing = members.find((m) => m.name === trimmed)
+      if (existing) return existing
+      const member: Member = { id: newId(), name: trimmed, sortOrder: members.length + 1 }
+      await store.set(MEMBERS, member.id, member)
+      return member
+    },
+
+    async renameMember(id: string, name: string) {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('名字不能为空')
+      const members = await ensureMembers(store)
+      const target = members.find((m) => m.id === id)
+      if (!target) throw new Error('衣柜不存在')
+      if (members.some((m) => m.id !== id && m.name === trimmed)) {
+        throw new Error('这个名字已经有了')
+      }
+      await store.set(MEMBERS, id, { ...target, name: trimmed })
+      const garments = await readGarments(store)
+      for (const garment of garments) {
+        if (garment.memberId === id) await putGarment(store, { ...garment, member: trimmed })
+      }
+    },
+
+    async deleteMember(id: string, deleteClothes: boolean) {
+      const members = await ensureMembers(store)
+      if (!members.some((m) => m.id === id)) throw new Error('衣柜不存在')
+      let deleted = 0
+      if (deleteClothes) {
+        const garments = await readGarments(store)
+        for (const garment of garments) {
+          if (garment.memberId !== id) continue
+          if (garment.photoPath) await store.remove(COLLECTION, garment.photoPath)
+          await store.remove(GARMENTS, garment.id)
+          deleted += 1
+        }
+      }
+      await store.remove(MEMBERS, id)
+      return { deleted, photos: [] as string[] }
     },
 
     async exportBundle() {

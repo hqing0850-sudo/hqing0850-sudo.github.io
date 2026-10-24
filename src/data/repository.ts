@@ -3,6 +3,7 @@ import type {
   ExportBundle,
   Garment,
   GarmentPatch,
+  Member,
   NewGarmentInput,
   WashLog,
   WashStatus
@@ -21,6 +22,10 @@ export interface WardrobeRepository {
   listCustomAssets(): Promise<CustomAsset[]>
   createCustomAsset(name: string, blob: Blob): Promise<CustomAsset>
   deleteCustomAsset(id: string): Promise<void>
+  listMembers(): Promise<Member[]>
+  createMember(name: string): Promise<Member>
+  renameMember(id: string, name: string): Promise<void>
+  deleteMember(id: string, deleteClothes: boolean): Promise<{ deleted: number; photos: string[] }>
   exportBundle(): Promise<ExportBundle>
   importBundle(bundle: ExportBundle): Promise<{ garments: number; logs: number }>
 }

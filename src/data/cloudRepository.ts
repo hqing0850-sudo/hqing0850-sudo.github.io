@@ -8,6 +8,7 @@ import type {
   Garment,
   GarmentPatch,
   ImageMode,
+  Member,
   NewGarmentInput,
   WashLog,
   WashStatus
@@ -62,6 +63,7 @@ type GarmentRow = {
   code: string
   category: Category
   member: string | null
+  member_id: string | null
   name: string
   color: string
   seasons: string[]
@@ -105,6 +107,7 @@ function rowToGarment(row: GarmentRow): Garment {
     code: row.code,
     category: row.category,
     member: row.member ?? '',
+    memberId: row.member_id ?? null,
     name: row.name,
     color: row.color ?? '',
     seasons: (row.seasons ?? []) as Garment['seasons'],
@@ -256,6 +259,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
           code,
           category: input.category,
           member: input.member?.trim() ?? '',
+          member_id: input.memberId ?? null,
           name: input.name.trim() || code,
           color: input.color.trim(),
           seasons: input.seasons,
@@ -319,6 +323,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
         color: patch.color ?? current.color,
         category: patch.category ?? current.category,
         member: patch.member ?? current.member,
+        member_id: patch.memberId === undefined ? current.memberId : patch.memberId,
         code,
         seasons: patch.seasons ?? current.seasons,
         thickness: patch.thickness ?? current.thickness,
@@ -435,6 +440,62 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
       await removePhoto((data as { photo_path: string | null } | null)?.photo_path ?? null)
     },
 
+    async listMembers() {
+      const { data, error } = await client
+        .from('wardrobe_members')
+        .select('id,name,sort_order')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (error) throw new Error(`读取衣柜失败：${error.message}`)
+      return (data ?? []).map((row: { id: string; name: string; sort_order: number }) => ({
+        id: row.id,
+        name: row.name,
+        sortOrder: row.sort_order
+      })) as Member[]
+    },
+
+    async createMember(name: string) {
+      const userId = await requireUserId()
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('名字不能为空')
+      const id = newId()
+      const { data, error } = await client
+        .from('wardrobe_members')
+        .insert({ id, user_id: userId, name: trimmed, sort_order: Math.floor(Date.now() / 1000) })
+        .select('*')
+        .single()
+      if (error) {
+        const duplicate = error.code === '23505' || error.message.includes('duplicate')
+        throw new Error(duplicate ? '这个名字已经有了' : `创建衣柜失败：${error.message}`)
+      }
+      return { id: data.id, name: data.name, sortOrder: data.sort_order } as Member
+    },
+
+    async renameMember(id: string, name: string) {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('名字不能为空')
+      const { error } = await client.rpc('rename_wardrobe', { p_id: id, p_new_name: trimmed })
+      if (error) throw new Error(error.message)
+    },
+
+    async deleteMember(id: string, deleteClothes: boolean) {
+      const { data, error } = await client.rpc('delete_wardrobe', {
+        p_id: id,
+        p_delete_clothes: deleteClothes
+      })
+      if (error) throw new Error(error.message)
+      const result = (data ?? {}) as { deleted?: number; photos?: string[] }
+      const photos = Array.isArray(result.photos) ? result.photos : []
+      if (photos.length) {
+        try {
+          await client.storage.from(BUCKET).remove(photos)
+        } catch {
+          // 衣柜已经删掉，照片清理失败不阻断
+        }
+      }
+      return { deleted: result.deleted ?? 0, photos }
+    },
+
     async exportBundle() {
       const garments = await listGarments()
       const photos: ExportBundle['photos'] = []
@@ -518,6 +579,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
           code,
           category: garment.category,
           member: garment.member ?? '',
+          member_id: garment.memberId ?? null,
           name: garment.name,
           color: garment.color,
           seasons: garment.seasons,

@@ -318,3 +318,105 @@ create policy "shared_photos_delete_own" on storage.objects
 --  完成。回到应用里用邮箱注册账号，然后就能在手机和电脑之间同步，
 --  并在「设置 → 分享衣橱」生成只读链接。
 -- ============================================================
+
+-- ============================================================
+--  8. 衣柜（爸爸/妈妈/我…）：独立数据，可改名、可删除
+-- ============================================================
+
+create table if not exists public.wardrobe_members (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+create index if not exists wardrobe_members_user_idx
+  on public.wardrobe_members (user_id, sort_order, created_at);
+
+alter table public.wardrobe_members enable row level security;
+
+drop policy if exists "members_select_own" on public.wardrobe_members;
+create policy "members_select_own" on public.wardrobe_members
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "members_insert_own" on public.wardrobe_members;
+create policy "members_insert_own" on public.wardrobe_members
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "members_update_own" on public.wardrobe_members;
+create policy "members_update_own" on public.wardrobe_members
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "members_delete_own" on public.wardrobe_members;
+create policy "members_delete_own" on public.wardrobe_members
+  for delete using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.wardrobe_members to authenticated;
+
+alter table public.garments add column if not exists member_id text;
+create index if not exists garments_user_member_id_idx on public.garments (user_id, member_id);
+
+create or replace function public.rename_wardrobe(p_id text, p_new_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  new_name text := btrim(coalesce(p_new_name, ''));
+  target public.wardrobe_members%rowtype;
+begin
+  if uid is null then raise exception '请先登录'; end if;
+  if new_name = '' then raise exception '名字不能为空'; end if;
+  select * into target from public.wardrobe_members where user_id = uid and id = p_id;
+  if not found then raise exception '衣柜不存在'; end if;
+  if exists (
+    select 1 from public.wardrobe_members
+    where user_id = uid and name = new_name and id <> p_id
+  ) then
+    raise exception '这个名字已经有了';
+  end if;
+  update public.wardrobe_members set name = new_name where user_id = uid and id = p_id;
+  update public.garments set member = new_name where user_id = uid and member_id = p_id;
+end;
+$$;
+
+revoke all on function public.rename_wardrobe(text, text) from public;
+grant execute on function public.rename_wardrobe(text, text) to authenticated;
+
+create or replace function public.delete_wardrobe(p_id text, p_delete_clothes boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  paths text[];
+  cnt int := 0;
+begin
+  if uid is null then raise exception '请先登录'; end if;
+  if not exists (select 1 from public.wardrobe_members where user_id = uid and id = p_id) then
+    raise exception '衣柜不存在';
+  end if;
+  if p_delete_clothes then
+    select coalesce(array_agg(photo_path) filter (where photo_path is not null), '{}')
+      into paths
+      from public.garments
+     where user_id = uid and member_id = p_id;
+    select count(*) into cnt from public.garments where user_id = uid and member_id = p_id;
+    delete from public.garments where user_id = uid and member_id = p_id;
+  else
+    paths := '{}';
+  end if;
+  delete from public.wardrobe_members where user_id = uid and id = p_id;
+  return jsonb_build_object('deleted', cnt, 'photos', to_jsonb(paths));
+end;
+$$;
+
+revoke all on function public.delete_wardrobe(text, boolean) from public;
+grant execute on function public.delete_wardrobe(text, boolean) to authenticated;
+

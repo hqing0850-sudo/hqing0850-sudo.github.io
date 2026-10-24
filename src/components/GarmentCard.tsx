@@ -5,14 +5,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { CATEGORY_META, CATEGORIES, WASH_STATUSES, WASH_STATUS_META } from '../types'
 import type { Garment } from '../types'
 
-export function GarmentCard({
-  garment,
-  onDelete
-}: {
-  garment: Garment
-  /** 传入后卡片右上角会出现删除按钮 */
-  onDelete?: (garment: Garment) => void
-}) {
+export function GarmentCard({ garment }: { garment: Garment }) {
   const navigate = useNavigate()
   const open = () => navigate(`/item/${garment.id}`)
   return (
@@ -38,18 +31,6 @@ export function GarmentCard({
           customAssetId={garment.customAssetId}
         />
         <span className="cat-tag">{CATEGORY_META[garment.category].label}</span>
-        {onDelete ? (
-          <button
-            className="card-delete"
-            aria-label={`删除 ${garment.code}`}
-            onClick={(event) => {
-              event.stopPropagation()
-              onDelete(garment)
-            }}
-          >
-            🗑
-          </button>
-        ) : null}
       </div>
       <div className="body">
         <span className="code">{garment.code}</span>

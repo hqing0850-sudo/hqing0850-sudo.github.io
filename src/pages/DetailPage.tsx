@@ -6,7 +6,6 @@ import { StatusBadge } from '../components/StatusBadge'
 import { Toast } from '../components/Toast'
 import { formatDateTime, daysSince } from '../lib/format'
 import { useWardrobe } from '../store/wardrobe'
-import { allMembers, rememberMember } from '../lib/members'
 import {
   CATEGORY_META,
   IMAGE_MODE_META,
@@ -21,8 +20,17 @@ export function DetailPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const navigate = useNavigate()
-  const { garments, logs, updateGarment, deleteGarment, setWashStatus, photoUrl, createCustomAsset } =
-    useWardrobe()
+  const {
+    garments,
+    logs,
+    updateGarment,
+    deleteGarment,
+    setWashStatus,
+    photoUrl,
+    createCustomAsset,
+    members,
+    addMember
+  } = useWardrobe()
 
   const garment = useMemo(() => garments.find((g) => g.id === id), [garments, id])
   const [mode, setMode] = useState<'view' | 'edit'>('view')
@@ -86,9 +94,17 @@ export function DetailPage() {
         customAssetId = asset.id
       }
       const input = toInput(form)
+      const memberName = (input.member ?? '').trim()
+      let memberId: string | null = null
+      if (memberName) {
+        const existing = members.find((m) => m.name === memberName)
+        const member = existing ?? (await addMember(memberName))
+        memberId = member.id
+      }
       const patch: GarmentPatch = {
         category: input.category,
-        member: input.member,
+        member: memberName,
+        memberId,
         name: input.name.trim() || garment.code,
         color: input.color,
         seasons: input.seasons,
@@ -99,7 +115,6 @@ export function DetailPage() {
         customAssetId
       }
       await updateGarment(garment.id, patch, form.photoChanged ? form.photo : undefined)
-      rememberMember(input.member ?? '')
       setMode('view')
       setToast({ message: '修改已保存', tone: 'info' })
     } catch (error) {
@@ -144,7 +159,7 @@ export function DetailPage() {
             busy={busy}
             submitLabel="保存修改"
             confirmCategoryChange
-            memberOptions={allMembers(garments)}
+            memberOptions={members.map((m) => m.name)}
           />
         </form>
         {toast ? <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} /> : null}
