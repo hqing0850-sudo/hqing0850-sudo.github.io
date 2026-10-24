@@ -3,19 +3,58 @@ import { useNavigate } from 'react-router-dom'
 import { GarmentForm, emptyFormValue, toInput, type GarmentFormValue } from '../components/GarmentForm'
 import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
+import { clearPendingPhoto, loadPendingPhoto } from '../lib/pendingPhoto'
+
+const DRAFT_KEY = 'wardrobe.addDraft'
+
+function loadDraft(): Partial<GarmentFormValue> | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<GarmentFormValue>) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(value: GarmentFormValue): void {
+  try {
+    const draft = {
+      category: value.category,
+      member: value.member,
+      name: value.name,
+      color: value.color,
+      seasons: value.seasons,
+      thickness: value.thickness,
+      notes: value.notes,
+      displayMode: value.displayMode,
+      cartoonId: value.cartoonId,
+      customAssetId: value.customAssetId
+    }
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // 存不进去也不影响填写
+  }
+}
 
 export function AddPage() {
   const navigate = useNavigate()
   const { members, createGarment, createCustomAsset, defaultImageMode, activeMember, addMember } =
     useWardrobe()
-  const [value, setValue] = useState<GarmentFormValue>(() => ({
-    ...emptyFormValue(defaultImageMode),
-    member:
-      activeMember === '__all__' || activeMember === '__none__'
-        ? ''
-        : members.find((m) => m.id === activeMember)?.name ?? ''
-  }))
+  const [value, setValue] = useState<GarmentFormValue>(() => {
+    const base: GarmentFormValue = {
+      ...emptyFormValue(defaultImageMode),
+      member:
+        activeMember === '__all__' || activeMember === '__none__'
+          ? ''
+          : members.find((m) => m.id === activeMember)?.name ?? ''
+    }
+    const draft = loadDraft()
+    return draft ? { ...base, ...draft } : base
+  })
   const [busy, setBusy] = useState(false)
+  const [restored, setRestored] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
 
   // 页面刷新时 members 是异步加载的，加载完后把当前衣柜补成默认归属
@@ -24,6 +63,35 @@ export function AddPage() {
     if (!activeName) return
     setValue((prev) => (prev.member ? prev : { ...prev, member: activeName }))
   }, [members, activeMember])
+  // 页面被微信/浏览器重启后，把刚才选的照片和填写内容恢复回来
+  useEffect(() => {
+    let active = true
+    void loadPendingPhoto().then((blob) => {
+      if (!active || !blob) return
+      if (blob.type && !blob.type.startsWith('image/')) {
+        void clearPendingPhoto()
+        return
+      }
+      const preview = URL.createObjectURL(blob)
+      setValue((prev) => ({
+        ...prev,
+        photo: blob,
+        photoPreview: preview,
+        photoChanged: true,
+        photoError: null,
+        displayMode: 'photo'
+      }))
+      setRestored(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    saveDraft(value)
+  }, [value])
+
   // 用 ref 记住「正在保存」，防止连点两次保存按钮创建出两件衣服
   const saving = useRef(false)
 
@@ -49,6 +117,8 @@ export function AddPage() {
         memberId = member.id
       }
       const created = await createGarment({ ...input, memberId, member: memberName, customAssetId })
+      await clearPendingPhoto()
+      sessionStorage.removeItem(DRAFT_KEY)
       navigate(`/item/${created.id}`, { replace: true, state: { created: created.code } })
     } catch (error) {
       setToast({ message: error instanceof Error ? error.message : '保存失败，请重试', tone: 'error' })
@@ -68,6 +138,23 @@ export function AddPage() {
           ✕
         </button>
       </header>
+
+      {restored ? (
+        <div className="hint-box">
+          <p className="note">已恢复刚才选的照片，请继续填写并点「保存到衣橱」。</p>
+          <button
+            type="button"
+            className="btn small ghost"
+            onClick={() => {
+              void clearPendingPhoto()
+              setRestored(false)
+              setValue((prev) => ({ ...prev, photo: null, photoPreview: null, photoChanged: true }))
+            }}
+          >
+            不要这张，重新选
+          </button>
+        </div>
+      ) : null}
 
       <form onSubmit={handleSubmit}>
         <GarmentForm

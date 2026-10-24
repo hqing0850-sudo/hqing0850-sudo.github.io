@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ImagePicker } from './ImagePicker'
 import { compressImage } from '../lib/image'
+import { savePendingPhoto, clearPendingPhoto } from '../lib/pendingPhoto'
 import {
   CATEGORIES,
   CATEGORY_META,
@@ -118,6 +119,14 @@ export function GarmentForm({
 
   async function handlePhoto(file: File | undefined) {
     if (!file) return
+    const looksLikeVideo =
+      (Boolean(file.type) && !file.type.startsWith('image/')) ||
+      /\.(mp4|mov|avi|mkv|3gp|m4v)$/i.test(file.name)
+    if (looksLikeVideo) {
+      patch({ photoError: '这是视频，请重新选择一张照片' })
+      return
+    }
+    void savePendingPhoto(file)
     setCompressing(true)
     try {
       const compressed = await compressImage(file)
@@ -223,7 +232,10 @@ export function GarmentForm({
         onCartoonChange={(cartoonId) => patch({ cartoonId, displayMode: 'cartoon' })}
         onCustomAssetChange={(customAssetId) => patch({ customAssetId, displayMode: 'cartoon' })}
         onPhotoPick={(file) => void handlePhoto(file)}
-        onPhotoRemove={() => patch({ photo: null, photoPreview: null, photoChanged: true })}
+        onPhotoRemove={() => {
+          void clearPendingPhoto()
+          patch({ photo: null, photoPreview: null, photoChanged: true })
+        }}
         onCustomFilePick={(blob, name) => void handleCustomFile(blob, name)}
       />
 

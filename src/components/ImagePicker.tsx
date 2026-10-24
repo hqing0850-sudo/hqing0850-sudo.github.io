@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CARTOON_COLORS, cartoonDataUri, listCartoonAssets } from '../lib/cartoon'
 import { compressImage } from '../lib/image'
+import { savePendingPhoto } from '../lib/pendingPhoto'
 import { useWardrobe } from '../store/wardrobe'
 import { CATEGORIES, CATEGORY_META, IMAGE_MODES, IMAGE_MODE_META } from '../types'
 import type { Category, ImageMode } from '../types'
@@ -286,10 +287,13 @@ export function ImagePicker({
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0]
           const input = e.target
-          if (file) onPhotoPick(file)
+          if (file) {
+            await savePendingPhoto(file)
+            onPhotoPick(file)
+          }
           // 微信/鸿蒙上立刻清空 value 可能让 File 失效，等照片处理完再清
           setTimeout(() => {
             input.value = ''
@@ -301,10 +305,13 @@ export function ImagePicker({
         className="file-input-hidden"
         type="file"
         accept="image/*"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0]
           const input = e.target
-          if (file) onPhotoPick(file)
+          if (file) {
+            await savePendingPhoto(file)
+            onPhotoPick(file)
+          }
           setTimeout(() => {
             input.value = ''
           }, 3000)
