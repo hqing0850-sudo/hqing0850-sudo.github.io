@@ -288,8 +288,12 @@ export function ImagePicker({
         capture="environment"
         onChange={(e) => {
           const file = e.target.files?.[0]
+          const input = e.target
           if (file) onPhotoPick(file)
-          e.target.value = ''
+          // 微信/鸿蒙上立刻清空 value 可能让 File 失效，等照片处理完再清
+          setTimeout(() => {
+            input.value = ''
+          }, 3000)
         }}
       />
       <input
@@ -299,8 +303,11 @@ export function ImagePicker({
         accept="image/*"
         onChange={(e) => {
           const file = e.target.files?.[0]
+          const input = e.target
           if (file) onPhotoPick(file)
-          e.target.value = ''
+          setTimeout(() => {
+            input.value = ''
+          }, 3000)
         }}
       />
       <input
@@ -310,8 +317,11 @@ export function ImagePicker({
         accept="image/*"
         onChange={(e) => {
           const file = e.target.files?.[0]
+          const input = e.target
           if (file) void handleCustomFile(file)
-          e.target.value = ''
+          setTimeout(() => {
+            input.value = ''
+          }, 3000)
         }}
       />
       {busy ? <span className="note">保存中…</span> : null}
