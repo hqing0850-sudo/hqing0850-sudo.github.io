@@ -1777,3 +1777,30 @@ a {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+
+.share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.share-actions .btn.block {
+  width: 100%;
+}
+
+.share-result {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.share-result a {
+  font-weight: 600;
+  text-decoration: underline;
+}
+

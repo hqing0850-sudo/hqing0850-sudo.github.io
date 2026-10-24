@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CategoryChips } from '../components/GarmentCard'
 import { StatusBadge } from '../components/StatusBadge'
 import { cartoonDataUri } from '../lib/cartoon'
 import { fetchShared, sharedPhotoUrl, type SharePayload, type SharedGarment } from '../data/shares'
+import { useWardrobe } from '../store/wardrobe'
 import { CATEGORY_META, SEASON_META, THICKNESS_META } from '../types'
 
 function ShareThumb({ token, garment }: { token: string; garment: SharedGarment }) {
@@ -32,12 +33,17 @@ function ShareThumb({ token, garment }: { token: string; garment: SharedGarment 
 
 export function SharePage() {
   const { token = '' } = useParams()
+  const navigate = useNavigate()
+  const { mode, garments: myGarments, createGarment } = useWardrobe()
   const [payload, setPayload] = useState<SharePayload | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
   const [active, setActive] = useState<SharedGarment | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [result, setResult] = useState<{ added: number; skipped: number; failed: number } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -81,6 +87,65 @@ export function SharePage() {
     return map
   }, [garments])
 
+  const canImport = mode === 'cloud'
+
+  async function runImport(items: SharedGarment[]) {
+    if (!canImport) {
+      navigate('/settings')
+      return
+    }
+    if (!items.length) return
+    setImporting(true)
+    setResult(null)
+    let added = 0
+    let skipped = 0
+    let failed = 0
+    for (let i = 0; i < items.length; i += 1) {
+      const g = items[i]
+      setProgress(`正在导入 ${i + 1}/${items.length}`)
+      const duplicate =
+        Boolean(g.name) &&
+        myGarments.some((x) => x.name === g.name && x.color === g.color && x.category === g.category)
+      if (duplicate) {
+        skipped += 1
+        continue
+      }
+      let photo: Blob | null = null
+      if (g.displayMode === 'photo' && g.hasPhoto) {
+        const url = sharedPhotoUrl(token, g.id)
+        if (url) {
+          try {
+            const response = await fetch(url)
+            if (response.ok) photo = await response.blob()
+          } catch {
+            // 照片拿不到就只导入文字信息
+          }
+        }
+      }
+      try {
+        await createGarment({
+          category: g.category,
+          name: g.name,
+          color: g.color,
+          seasons: g.seasons,
+          thickness: g.thickness,
+          notes: '',
+          photo,
+          displayMode: photo ? 'photo' : g.displayMode === 'cartoon' ? 'cartoon' : 'hidden',
+          cartoonId: photo ? null : g.cartoonId,
+          customAssetId: null
+        })
+        added += 1
+      } catch {
+        failed += 1
+      }
+    }
+    setImporting(false)
+    setProgress('')
+    setResult({ added, skipped, failed })
+    setActive(null)
+  }
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -115,7 +180,33 @@ export function SharePage() {
 
       <div className="share-banner">
         <span>🔗</span>
-        <span>这是别人分享给你的衣橱，你可以浏览，但不能修改。</span>
+        <span>这是别人分享给你的衣橱，你可以浏览，也可以把喜欢的衣服导入自己的衣橱。</span>
+      </div>
+
+      <div className="share-actions">
+        {canImport ? (
+          <button
+            className="btn primary block"
+            disabled={importing || garments.length === 0}
+            onClick={() => void runImport(garments)}
+          >
+            {importing ? progress || '正在导入…' : '＋ 全部导入到我的衣橱'}
+          </button>
+        ) : (
+          <button className="btn block" onClick={() => navigate('/settings')}>
+            登录后可以一键导入到我的衣橱
+          </button>
+        )}
+        {result ? (
+          <p className="share-result">
+            已导入 {result.added} 件
+            {result.skipped ? `，跳过 ${result.skipped} 件已有` : ''}
+            {result.failed ? `，失败 ${result.failed} 件` : ''}。
+            <a href="/wardrobe">去看看我的衣橱 →</a>
+          </p>
+        ) : (
+          <p className="note">导入是复制一份到你的账号，对方的衣橱不会被改动；编号会按你的衣橱自动重新分配。</p>
+        )}
       </div>
 
       <div className="search">
@@ -202,6 +293,15 @@ export function SharePage() {
                   <dd>{THICKNESS_META[active.thickness]}</dd>
                 </div>
               </dl>
+              <button
+                className="btn small primary"
+                disabled={importing}
+                onClick={() => {
+                  if (active) void runImport([active])
+                }}
+              >
+                导入这一件到我的衣橱
+              </button>
             </div>
           </div>
         </div>

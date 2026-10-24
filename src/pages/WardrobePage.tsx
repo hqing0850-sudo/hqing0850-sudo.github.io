@@ -116,9 +116,11 @@ export function WardrobePage() {
         </div>
       )}
 
-      <button className="fab" onClick={() => navigate('/add')} aria-label="添加衣服">
-        ＋ 添加衣服
-      </button>
+      {garments.length > 0 ? (
+        <button className="fab" onClick={() => navigate('/add')} aria-label="添加衣服">
+          ＋ 添加衣服
+        </button>
+      ) : null}
     </>
   )
 }
