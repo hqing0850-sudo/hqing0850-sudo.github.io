@@ -42,6 +42,7 @@ function withAllocationLock<T>(task: () => Promise<T>): Promise<T> {
 function normalizeGarment(garment: Garment): Garment {
   return {
     ...garment,
+    member: garment.member ?? '',
     displayMode: garment.displayMode ?? 'photo',
     cartoonId: garment.cartoonId ?? null,
     customAssetId: garment.customAssetId ?? null
@@ -100,6 +101,7 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
           id,
           code,
           category: input.category,
+          member: input.member?.trim() ?? '',
           name: input.name.trim() || code,
           color: input.color.trim(),
           seasons: input.seasons,

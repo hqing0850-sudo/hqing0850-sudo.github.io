@@ -125,6 +125,7 @@ export function SharePage() {
       try {
         await createGarment({
           category: g.category,
+          member: g.member ?? '',
           name: g.name,
           color: g.color,
           seasons: g.seasons,
@@ -253,6 +254,7 @@ export function SharePage() {
               <div className="body">
                 <span className="code">{g.code}</span>
                 <span className="name">{g.name}</span>
+                {g.member ? <span className="member-tag">{g.member}</span> : null}
                 <StatusBadge status={g.washStatus} />
               </div>
             </button>
@@ -274,6 +276,10 @@ export function SharePage() {
               <h2>{active.name || '未命名'}</h2>
               <StatusBadge status={active.washStatus} />
               <dl className="share-facts">
+                <div>
+                  <dt>归属</dt>
+                  <dd>{active.member || '未分类'}</dd>
+                </div>
                 <div>
                   <dt>分类</dt>
                   <dd>

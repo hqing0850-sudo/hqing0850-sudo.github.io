@@ -26,6 +26,7 @@ export function GarmentCard({ garment }: { garment: Garment }) {
       <div className="body">
         <span className="code">{garment.code}</span>
         <span className="name">{garment.name}</span>
+        {garment.member ? <span className="member-tag">{garment.member}</span> : null}
         <StatusBadge status={garment.washStatus} />
       </div>
     </button>

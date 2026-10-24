@@ -61,6 +61,7 @@ create table if not exists public.garments (
   user_id uuid not null references auth.users(id) on delete cascade,
   code text not null,
   category text not null check (category in ('top', 'outerwear', 'pants')),
+  member text not null default '',
   name text not null default '',
   color text not null default '',
   seasons text[] not null default '{}',
@@ -85,8 +86,10 @@ create table if not exists public.garments (
 alter table public.garments add column if not exists display_mode text not null default 'photo';
 alter table public.garments add column if not exists cartoon_id text;
 alter table public.garments add column if not exists custom_asset_id text;
+alter table public.garments add column if not exists member text not null default '';
 
 create index if not exists garments_user_created_idx on public.garments (user_id, created_at desc);
+create index if not exists garments_user_member_idx on public.garments (user_id, member);
 
 -- ---------- 3. 洗涤记录表 ----------
 create table if not exists public.wash_logs (

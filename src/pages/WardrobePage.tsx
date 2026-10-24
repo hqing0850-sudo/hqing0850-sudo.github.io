@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryChips, GarmentCard, StatusFilterChips, useFilteredGarments } from '../components/GarmentCard'
 import { useWardrobe } from '../store/wardrobe'
+import { allMembers } from '../lib/members'
 import { CATEGORIES } from '../types'
 
 type SortKey = 'newest' | 'code' | 'status'
@@ -26,18 +27,25 @@ export function WardrobePage() {
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
+  const [member, setMember] = useState('all')
   const [sort, setSort] = useState<SortKey>('newest')
 
   const filtered = useFilteredGarments(garments, category, status, query)
 
+  const visible = useMemo(() => {
+    if (member === 'all') return filtered
+    if (member === '__none__') return filtered.filter((g) => !g.member)
+    return filtered.filter((g) => g.member === member)
+  }, [filtered, member])
+
   const sorted = useMemo(() => {
-    const list = [...filtered]
+    const list = [...visible]
     if (sort === 'newest') list.sort((a, b) => b.createdAt - a.createdAt)
     if (sort === 'code') list.sort((a, b) => a.code.localeCompare(b.code, 'zh-CN', { numeric: true }))
     if (sort === 'status')
       list.sort((a, b) => (STATUS_ORDER[a.washStatus] ?? 9) - (STATUS_ORDER[b.washStatus] ?? 9))
     return list
-  }, [filtered, sort])
+  }, [visible, sort])
 
   const counts = useMemo(() => {
     const base: Record<string, number> = { all: garments.length }
@@ -46,15 +54,25 @@ export function WardrobePage() {
     return base
   }, [garments])
 
+  const memberOptions = useMemo(() => allMembers(garments), [garments])
+  const memberCounts = useMemo(() => {
+    const map: Record<string, number> = { all: garments.length, __none__: 0 }
+    for (const g of garments) {
+      if (g.member) map[g.member] = (map[g.member] ?? 0) + 1
+      else map.__none__ += 1
+    }
+    return map
+  }, [garments])
+
   return (
     <>
       <header className="page-head">
         <div>
           <h1>我的衣服</h1>
           <p className="sub">
-            {filtered.length === garments.length
+            {visible.length === garments.length
               ? `共 ${garments.length} 件`
-              : `筛出 ${filtered.length} 件 / 共 ${garments.length} 件`}
+              : `筛出 ${visible.length} 件 / 共 ${garments.length} 件`}
           </p>
         </div>
         <button className="btn small primary" onClick={() => navigate('/add')}>
@@ -88,6 +106,34 @@ export function WardrobePage() {
           </button>
         ) : null}
       </div>
+
+      {memberOptions.length > 0 ? (
+        <div className="chips member-chips" aria-label="按归属筛选">
+          <button className={`chip ${member === 'all' ? 'active' : ''}`} onClick={() => setMember('all')}>
+            👨‍👩‍👧 全部
+            <span className="count">{memberCounts.all}</span>
+          </button>
+          {memberOptions.map((name) => (
+            <button
+              key={name}
+              className={`chip ${member === name ? 'active' : ''}`}
+              onClick={() => setMember(name)}
+            >
+              {name}
+              <span className="count">{memberCounts[name] ?? 0}</span>
+            </button>
+          ))}
+          {memberCounts.__none__ ? (
+            <button
+              className={`chip ${member === '__none__' ? 'active' : ''}`}
+              onClick={() => setMember('__none__')}
+            >
+              未分类
+              <span className="count">{memberCounts.__none__}</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <CategoryChips value={category} onChange={setCategory} counts={counts} />
       <StatusFilterChips value={status} onChange={setStatus} />

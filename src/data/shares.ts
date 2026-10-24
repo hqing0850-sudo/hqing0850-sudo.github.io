@@ -7,6 +7,7 @@ export interface SharedGarment {
   id: string
   code: string
   category: Category
+  member: string
   name: string
   color: string
   seasons: Season[]
@@ -45,6 +46,7 @@ function toShared(g: Garment): SharedGarment {
     id: g.id,
     code: g.code,
     category: g.category,
+    member: g.member ?? '',
     name: g.name,
     color: g.color,
     seasons: g.seasons,

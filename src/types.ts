@@ -54,6 +54,8 @@ export interface Garment {
   id: string
   code: string
   category: Category
+  /** 归属：爸爸 / 妈妈 / 我 … 可自定义，空字符串表示未分类 */
+  member: string
   name: string
   color: string
   seasons: Season[]
@@ -97,6 +99,8 @@ export interface WashLog {
 
 export type NewGarmentInput = {
   category: Category
+  /** 归属（可选；老数据/测试里可能没有） */
+  member?: string
   name: string
   color: string
   seasons: Season[]
@@ -114,6 +118,7 @@ export type GarmentPatch = Partial<
     | 'name'
     | 'color'
     | 'category'
+    | 'member'
     | 'seasons'
     | 'thickness'
     | 'notes'

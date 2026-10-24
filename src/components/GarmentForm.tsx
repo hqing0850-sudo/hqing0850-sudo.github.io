@@ -10,9 +10,11 @@ import {
   THICKNESS_META
 } from '../types'
 import type { Category, Garment, ImageMode, NewGarmentInput, Season, Thickness } from '../types'
+import { DEFAULT_MEMBERS } from '../lib/members'
 
 export interface GarmentFormValue {
   category: Category
+  member: string
   name: string
   color: string
   seasons: Season[]
@@ -36,6 +38,7 @@ export interface GarmentFormValue {
 export function emptyFormValue(defaultMode: ImageMode = 'cartoon'): GarmentFormValue {
   return {
     category: 'top',
+    member: '',
     name: '',
     color: '',
     seasons: [],
@@ -57,6 +60,7 @@ export function emptyFormValue(defaultMode: ImageMode = 'cartoon'): GarmentFormV
 export function formValueFromGarment(garment: Garment, preview: string | null): GarmentFormValue {
   return {
     category: garment.category,
+    member: garment.member,
     name: garment.name,
     color: garment.color,
     seasons: garment.seasons,
@@ -78,6 +82,7 @@ export function formValueFromGarment(garment: Garment, preview: string | null): 
 export function toInput(value: GarmentFormValue): NewGarmentInput {
   return {
     category: value.category,
+    member: value.member,
     name: value.name,
     color: value.color,
     seasons: value.seasons,
@@ -95,7 +100,8 @@ export function GarmentForm({
   onChange,
   busy,
   submitLabel,
-  confirmCategoryChange = false
+  confirmCategoryChange = false,
+  memberOptions = DEFAULT_MEMBERS
 }: {
   value: GarmentFormValue
   onChange: (next: GarmentFormValue) => void
@@ -103,6 +109,8 @@ export function GarmentForm({
   submitLabel: string
   /** 编辑已有衣服时，换分类会重新分配编号，需要确认 */
   confirmCategoryChange?: boolean
+  /** 可选的归属名单（爸爸/妈妈/我…） */
+  memberOptions?: string[]
 }) {
   const [compressing, setCompressing] = useState(false)
 
@@ -216,6 +224,37 @@ export function GarmentForm({
         {confirmCategoryChange ? (
           <p className="note">更换分类会分配一个从没用过的新编号，旧编号作废。</p>
         ) : null}
+      </div>
+
+      <div className="field">
+        <label htmlFor="g-member">归属（谁的衣柜）</label>
+        <div className="toggle-row">
+          {memberOptions.map((name) => (
+            <button
+              type="button"
+              key={name}
+              className={`toggle-chip ${value.member === name ? 'on' : ''}`}
+              onClick={() => patch({ member: name })}
+            >
+              {name}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`toggle-chip ${value.member ? '' : 'on'}`}
+            onClick={() => patch({ member: '' })}
+          >
+            未分类
+          </button>
+        </div>
+        <input
+          id="g-member"
+          className="input"
+          value={value.member}
+          maxLength={12}
+          placeholder="点上面的名字，或直接输入自定义名称"
+          onChange={(e) => patch({ member: e.target.value })}
+        />
       </div>
 
       <div className="field">

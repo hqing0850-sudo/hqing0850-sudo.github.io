@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { Toast } from '../components/Toast'
 import { formatDateTime, daysSince } from '../lib/format'
 import { useWardrobe } from '../store/wardrobe'
+import { allMembers, rememberMember } from '../lib/members'
 import {
   CATEGORY_META,
   IMAGE_MODE_META,
@@ -87,6 +88,7 @@ export function DetailPage() {
       const input = toInput(form)
       const patch: GarmentPatch = {
         category: input.category,
+        member: input.member,
         name: input.name.trim() || garment.code,
         color: input.color,
         seasons: input.seasons,
@@ -97,6 +99,7 @@ export function DetailPage() {
         customAssetId
       }
       await updateGarment(garment.id, patch, form.photoChanged ? form.photo : undefined)
+      rememberMember(input.member ?? '')
       setMode('view')
       setToast({ message: '修改已保存', tone: 'info' })
     } catch (error) {
@@ -141,6 +144,7 @@ export function DetailPage() {
             busy={busy}
             submitLabel="保存修改"
             confirmCategoryChange
+            memberOptions={allMembers(garments)}
           />
         </form>
         {toast ? <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} /> : null}
@@ -204,6 +208,10 @@ export function DetailPage() {
           </div>
 
           <div className="spec-list">
+            <div className="spec">
+              <span className="k">归属</span>
+              <span className="v">{garment.member || '未分类'}</span>
+            </div>
             <div className="spec">
               <span className="k">分类</span>
               <span className="v">

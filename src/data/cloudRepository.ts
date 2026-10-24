@@ -61,6 +61,7 @@ type GarmentRow = {
   id: string
   code: string
   category: Category
+  member: string | null
   name: string
   color: string
   seasons: string[]
@@ -103,6 +104,7 @@ function rowToGarment(row: GarmentRow): Garment {
     id: row.id,
     code: row.code,
     category: row.category,
+    member: row.member ?? '',
     name: row.name,
     color: row.color ?? '',
     seasons: (row.seasons ?? []) as Garment['seasons'],
@@ -253,6 +255,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
           user_id: userId,
           code,
           category: input.category,
+          member: input.member?.trim() ?? '',
           name: input.name.trim() || code,
           color: input.color.trim(),
           seasons: input.seasons,
@@ -315,6 +318,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
         name: patch.name ?? current.name,
         color: patch.color ?? current.color,
         category: patch.category ?? current.category,
+        member: patch.member ?? current.member,
         code,
         seasons: patch.seasons ?? current.seasons,
         thickness: patch.thickness ?? current.thickness,
@@ -513,6 +517,7 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
           user_id: userId,
           code,
           category: garment.category,
+          member: garment.member ?? '',
           name: garment.name,
           color: garment.color,
           seasons: garment.seasons,

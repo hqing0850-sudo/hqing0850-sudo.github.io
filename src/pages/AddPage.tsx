@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { GarmentForm, emptyFormValue, toInput, type GarmentFormValue } from '../components/GarmentForm'
 import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
+import { allMembers, rememberMember } from '../lib/members'
 
 export function AddPage() {
   const navigate = useNavigate()
-  const { createGarment, createCustomAsset, defaultImageMode } = useWardrobe()
+  const { garments, createGarment, createCustomAsset, defaultImageMode } = useWardrobe()
   const [value, setValue] = useState<GarmentFormValue>(() => emptyFormValue(defaultImageMode))
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
@@ -27,6 +28,7 @@ export function AddPage() {
       }
 
       const input = toInput(value)
+      rememberMember(input.member ?? '')
       const created = await createGarment({ ...input, customAssetId })
       navigate(`/item/${created.id}`, { replace: true, state: { created: created.code } })
     } catch (error) {
@@ -49,7 +51,13 @@ export function AddPage() {
       </header>
 
       <form onSubmit={handleSubmit}>
-        <GarmentForm value={value} onChange={setValue} busy={busy} submitLabel="保存到衣橱" />
+        <GarmentForm
+          value={value}
+          onChange={setValue}
+          busy={busy}
+          submitLabel="保存到衣橱"
+          memberOptions={allMembers(garments)}
+        />
       </form>
 
       {toast ? <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} /> : null}

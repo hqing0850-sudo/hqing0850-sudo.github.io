@@ -1823,3 +1823,19 @@ a {
   flex-shrink: 0;
 }
 
+
+.member-chips {
+  margin-bottom: 8px;
+}
+
+.member-tag {
+  align-self: flex-start;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+
