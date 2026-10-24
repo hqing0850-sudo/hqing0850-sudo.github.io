@@ -40,6 +40,13 @@ export function rememberMember(name: string): void {
   }
 }
 
+/** 显示用标题：名字本身已带“衣柜”就不重复加 */
+export function wardrobeTitle(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return '未分类'
+  return trimmed.endsWith('衣柜') ? trimmed : `${trimmed}的衣柜`
+}
+
 /** 成员列表 = 本机名单 + 现有衣服里出现过的名字 */
 export function allMembers(garments: { member?: string }[]): string[] {
   return unique([...loadMembers(), ...garments.map((g) => g.member ?? '')])

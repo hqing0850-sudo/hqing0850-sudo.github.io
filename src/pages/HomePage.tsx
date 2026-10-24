@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GarmentCard } from '../components/GarmentCard'
 import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
+import { wardrobeTitle } from '../lib/members'
 import { useWardrobe } from '../store/wardrobe'
 import { CATEGORIES, CATEGORY_META, WASH_STATUS_META } from '../types'
 import { relativeTime } from '../lib/format'
@@ -59,7 +60,7 @@ export function HomePage() {
               ? '衣橱概览'
               : activeMember === '__none__'
                 ? '未分类的衣服'
-                : `${members.find((m) => m.id === activeMember)?.name ?? '全部'}的衣柜`}
+                : wardrobeTitle(members.find((m) => m.id === activeMember)?.name ?? '全部')}
           </h1>
           <p className="sub">
             共 {stats.total} 件衣服 · {mode === 'cloud' ? '已同步到云端' : '保存在本机'}

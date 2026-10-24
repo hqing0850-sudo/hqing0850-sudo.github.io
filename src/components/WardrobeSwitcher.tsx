@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useWardrobe } from '../store/wardrobe'
 import type { Member } from '../types'
+import { wardrobeTitle } from '../lib/members'
 
 const ALL = '__all__'
 const NONE = '__none__'
@@ -30,7 +31,7 @@ export function WardrobeSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'her
   const active = members.find((m) => m.id === activeMember)
   const shortLabel = activeMember === ALL ? '全部' : activeMember === NONE ? '未分类' : active?.name ?? '全部'
   const fullLabel =
-    activeMember === ALL ? '全部衣柜' : activeMember === NONE ? '未分类' : `${active?.name ?? '全部'}的衣柜`
+    activeMember === ALL ? '全部衣柜' : activeMember === NONE ? '未分类' : wardrobeTitle(active?.name ?? '全部')
 
   function reset() {
     setEditingId(null)
@@ -165,7 +166,7 @@ export function WardrobeSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'her
                       className={`switch-option ${activeMember === member.id ? 'on' : ''}`}
                       onClick={() => choose(member.id)}
                     >
-                      <span>{member.name}的衣柜</span>
+                      <span>{wardrobeTitle(member.name)}</span>
                       <span className="switch-count">{counts[member.id] ?? 0}</span>
                     </button>
                     <div className="switch-row-actions">

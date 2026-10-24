@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CategoryChips, GarmentCard, StatusFilterChips, useFilteredGarments } from '../components/GarmentCard'
 import { useWardrobe } from '../store/wardrobe'
 import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
+import { wardrobeTitle } from '../lib/members'
 import { CATEGORIES } from '../types'
 
 type SortKey = 'newest' | 'code' | 'status'
@@ -62,7 +63,7 @@ export function WardrobePage() {
               ? '我的衣服'
               : activeMember === '__none__'
                 ? '未分类'
-                : `${members.find((m) => m.id === activeMember)?.name ?? '全部'}的衣柜`}
+                : wardrobeTitle(members.find((m) => m.id === activeMember)?.name ?? '全部')}
           </h1>
           <p className="sub">
             {filtered.length === scoped.length
