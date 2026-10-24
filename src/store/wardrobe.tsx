@@ -97,7 +97,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const [cloudBusy, setCloudBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [defaultImageMode, setDefaultImageModeState] = useState<ImageMode>(() => loadDefaultImageMode())
-  const [activeMember, setActiveMemberState] = useState<string>(() => {
+  const [activeMemberId, setActiveMemberState] = useState<string>(() => {
     try {
       return localStorage.getItem('wardrobe.activeMember') || '__all__'
     } catch {
@@ -105,6 +105,12 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
     }
   })
   const [members, setMembers] = useState<Member[]>([])
+  // 登录过程中会先短暂用本机名单；这里不急着把 activeMember 改成“全部”，
+  // 等云端名单加载后，原来选中的衣柜编号还能重新匹配上。
+  const activeMember = useMemo(() => {
+    if (activeMemberId === '__all__' || activeMemberId === '__none__') return activeMemberId
+    return members.some((m) => m.id === activeMemberId) ? activeMemberId : '__all__'
+  }, [activeMemberId, members])
   const repoRef = useRef<WardrobeRepository>(createLocalRepository())
 
   const mode: Mode = client && session ? 'cloud' : 'local'
@@ -153,10 +159,6 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       setLogs(nextLogs)
       setCustomAssets(nextAssets)
       setMembers(nextMembers)
-      setActiveMemberState((prev) => {
-        if (prev === '__all__' || prev === '__none__') return prev
-        return nextMembers.some((m) => m.id === prev) ? prev : '__all__'
-      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : '读取数据失败')
