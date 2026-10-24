@@ -1,57 +1,71 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GarmentCard } from '../components/GarmentCard'
+import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
 import { useWardrobe } from '../store/wardrobe'
 import { CATEGORIES, CATEGORY_META, WASH_STATUS_META } from '../types'
 import { relativeTime } from '../lib/format'
 
 export function HomePage() {
-  const { garments, logs, mode } = useWardrobe()
+  const { garments, logs, mode, activeMember } = useWardrobe()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<string>('all')
+
+  const scoped = useMemo(() => {
+    if (activeMember === '__all__') return garments
+    if (activeMember === '__none__') return garments.filter((g) => !g.member)
+    return garments.filter((g) => g.member === activeMember)
+  }, [garments, activeMember])
 
   const stats = useMemo(() => {
     const byCategory = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<string, number>
     let toWash = 0
     let dirty = 0
-    for (const g of garments) {
+    for (const g of scoped) {
       byCategory[g.category] += 1
       if (g.washStatus === 'to_wash') toWash += 1
       if (g.washStatus === 'to_wash' || g.washStatus === 'washing') dirty += 1
     }
-    return { total: garments.length, byCategory, toWash, dirty }
-  }, [garments])
+    return { total: scoped.length, byCategory, toWash, dirty }
+  }, [scoped])
 
   const recent = useMemo(() => {
-    const sorted = [...garments].sort((a, b) => b.createdAt - a.createdAt)
+    const sorted = [...scoped].sort((a, b) => b.createdAt - a.createdAt)
     if (filter === 'all') return sorted.slice(0, 8)
     return sorted.filter((g) => g.category === filter).slice(0, 8)
-  }, [garments, filter])
+  }, [scoped, filter])
 
   const laundryQueue = useMemo(
     () =>
-      garments
+      scoped
         .filter((g) => g.washStatus === 'to_wash' || g.washStatus === 'washing')
         .sort((a, b) => a.statusChangedAt - b.statusChangedAt)
         .slice(0, 4),
-    [garments]
+    [scoped]
   )
 
-  const lastLog = logs[0]
+  const lastLog = useMemo(() => {
+    const ids = new Set(scoped.map((g) => g.id))
+    return logs.find((log) => ids.has(log.itemId))
+  }, [logs, scoped])
 
   return (
     <>
       <header className="hero">
         <div>
           <p className="eyebrow">我的 AI 衣橱</p>
-          <h1>衣橱概览</h1>
+          <h1>
+            {activeMember === '__all__'
+              ? '衣橱概览'
+              : activeMember === '__none__'
+                ? '未分类的衣服'
+                : `${activeMember}的衣柜`}
+          </h1>
           <p className="sub">
             共 {stats.total} 件衣服 · {mode === 'cloud' ? '已同步到云端' : '保存在本机'}
           </p>
         </div>
-        <div className="hero-mark" aria-hidden>
-          衣
-        </div>
+        <WardrobeSwitcher variant="hero" />
       </header>
 
       <div className="stat-row">
@@ -116,11 +130,15 @@ export function HomePage() {
         </div>
       ) : null}
 
-      {garments.length === 0 ? (
+      {scoped.length === 0 ? (
         <div className="empty">
           <div className="big">🧺</div>
-          <h3>衣橱还是空的</h3>
-          <p>拍下第一件衣服，它会自动获得一个编号。</p>
+          <h3>{activeMember === '__all__' ? '衣橱还是空的' : '这个衣柜还是空的'}</h3>
+          <p>
+            {activeMember === '__all__'
+              ? '拍下第一件衣服，它会自动获得一个编号。'
+              : `点下面添加，衣服会自动归到「${activeMember === '__none__' ? '未分类' : activeMember}」。`}
+          </p>
           <button className="btn primary" onClick={() => navigate('/add')}>
             ＋ 添加第一件衣服
           </button>

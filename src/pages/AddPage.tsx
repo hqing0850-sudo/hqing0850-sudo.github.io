@@ -7,8 +7,11 @@ import { allMembers, rememberMember } from '../lib/members'
 
 export function AddPage() {
   const navigate = useNavigate()
-  const { garments, createGarment, createCustomAsset, defaultImageMode } = useWardrobe()
-  const [value, setValue] = useState<GarmentFormValue>(() => emptyFormValue(defaultImageMode))
+  const { garments, createGarment, createCustomAsset, defaultImageMode, activeMember } = useWardrobe()
+  const [value, setValue] = useState<GarmentFormValue>(() => ({
+    ...emptyFormValue(defaultImageMode),
+    member: activeMember === '__all__' || activeMember === '__none__' ? '' : activeMember
+  }))
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
   // 用 ref 记住「正在保存」，防止连点两次保存按钮创建出两件衣服

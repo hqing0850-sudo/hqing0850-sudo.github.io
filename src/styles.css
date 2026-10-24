@@ -1839,3 +1839,91 @@ a {
   border: 1px solid var(--line);
 }
 
+
+.hero-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.hero-switch .hero-mark {
+  cursor: pointer;
+}
+
+.hero-switch-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.wardrobe-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 12px;
+  flex-wrap: wrap;
+}
+
+.wardrobe-switch {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.switcher-sheet {
+  max-width: 380px;
+}
+
+.switcher-body {
+  padding: 22px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.switcher-body h2 {
+  font-size: 19px;
+  margin-bottom: 2px;
+}
+
+.switch-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+  text-align: left;
+}
+
+.switch-option.on {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.switch-count {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.switch-option.on .switch-count {
+  color: var(--brand);
+}
+
+.switcher-new {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.switcher-new .input {
+  flex: 1;
+}
+

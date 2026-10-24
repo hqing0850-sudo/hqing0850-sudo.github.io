@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { createLocalRepository } from '../data/localRepository'
+import { allMembers, rememberMember } from '../lib/members'
 import {
   createCloudRepository,
   createSupabaseClient,
@@ -51,6 +52,12 @@ interface WardrobeState {
   session: Session | null
   cloudBusy: boolean
   defaultImageMode: ImageMode
+  /** 当前正在看的衣柜：'__all__' 全部 / 成员名字 / '__none__' 未分类 */
+  activeMember: string
+  /** 当前可用衣柜名单（默认成员 + 衣服里出现过的自定义名字） */
+  members: string[]
+  setActiveMember: (name: string) => void
+  addMember: (name: string) => void
   refresh: () => Promise<void>
   createGarment: (input: NewGarmentInput) => Promise<Garment>
   updateGarment: (id: string, patch: GarmentPatch, photo?: Blob | null) => Promise<void>
@@ -88,6 +95,15 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const [cloudBusy, setCloudBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [defaultImageMode, setDefaultImageModeState] = useState<ImageMode>(() => loadDefaultImageMode())
+  const [activeMember, setActiveMemberState] = useState<string>(() => {
+    try {
+      return localStorage.getItem('wardrobe.activeMember') || '__all__'
+    } catch {
+      return '__all__'
+    }
+  })
+  const [membersTick, setMembersTick] = useState(0)
+  const members = useMemo(() => allMembers(garments), [garments, membersTick])
   const repoRef = useRef<WardrobeRepository>(createLocalRepository())
 
   const mode: Mode = client && session ? 'cloud' : 'local'
@@ -194,6 +210,26 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       // 存不进去也不影响使用
     }
   }, [])
+
+  const setActiveMember = useCallback((name: string) => {
+    setActiveMemberState(name)
+    try {
+      localStorage.setItem('wardrobe.activeMember', name)
+    } catch {
+      // 记不住也不影响本次切换
+    }
+  }, [])
+
+  const addMember = useCallback(
+    (raw: string) => {
+      const name = raw.trim()
+      if (!name) return
+      rememberMember(name)
+      setMembersTick((n) => n + 1)
+      setActiveMember(name)
+    },
+    [setActiveMember]
+  )
 
   const connectCloud = useCallback((next: SupabaseConfig) => {
     saveSupabaseConfig(next)
@@ -354,6 +390,10 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       session,
       cloudBusy,
       defaultImageMode,
+      activeMember,
+      members,
+      setActiveMember,
+      addMember,
       refresh,
       createGarment,
       updateGarment,
@@ -389,6 +429,10 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       session,
       cloudBusy,
       defaultImageMode,
+      activeMember,
+      members,
+      setActiveMember,
+      addMember,
       refresh,
       createGarment,
       updateGarment,

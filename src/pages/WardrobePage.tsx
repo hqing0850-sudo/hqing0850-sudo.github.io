@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryChips, GarmentCard, StatusFilterChips, useFilteredGarments } from '../components/GarmentCard'
 import { useWardrobe } from '../store/wardrobe'
-import { allMembers } from '../lib/members'
+import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
 import { CATEGORIES } from '../types'
 
 type SortKey = 'newest' | 'code' | 'status'
@@ -22,57 +22,52 @@ const STATUS_ORDER: Record<string, number> = {
 }
 
 export function WardrobePage() {
-  const { garments, mode, ready } = useWardrobe()
+  const { garments, mode, ready, activeMember } = useWardrobe()
   const navigate = useNavigate()
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
-  const [member, setMember] = useState('all')
   const [sort, setSort] = useState<SortKey>('newest')
 
-  const filtered = useFilteredGarments(garments, category, status, query)
+  const scoped = useMemo(() => {
+    if (activeMember === '__all__') return garments
+    if (activeMember === '__none__') return garments.filter((g) => !g.member)
+    return garments.filter((g) => g.member === activeMember)
+  }, [garments, activeMember])
 
-  const visible = useMemo(() => {
-    if (member === 'all') return filtered
-    if (member === '__none__') return filtered.filter((g) => !g.member)
-    return filtered.filter((g) => g.member === member)
-  }, [filtered, member])
+  const filtered = useFilteredGarments(scoped, category, status, query)
 
   const sorted = useMemo(() => {
-    const list = [...visible]
+    const list = [...filtered]
     if (sort === 'newest') list.sort((a, b) => b.createdAt - a.createdAt)
     if (sort === 'code') list.sort((a, b) => a.code.localeCompare(b.code, 'zh-CN', { numeric: true }))
     if (sort === 'status')
       list.sort((a, b) => (STATUS_ORDER[a.washStatus] ?? 9) - (STATUS_ORDER[b.washStatus] ?? 9))
     return list
-  }, [visible, sort])
+  }, [filtered, sort])
 
   const counts = useMemo(() => {
-    const base: Record<string, number> = { all: garments.length }
+    const base: Record<string, number> = { all: scoped.length }
     for (const c of CATEGORIES) base[c] = 0
-    for (const g of garments) base[g.category] += 1
+    for (const g of scoped) base[g.category] += 1
     return base
-  }, [garments])
-
-  const memberOptions = useMemo(() => allMembers(garments), [garments])
-  const memberCounts = useMemo(() => {
-    const map: Record<string, number> = { all: garments.length, __none__: 0 }
-    for (const g of garments) {
-      if (g.member) map[g.member] = (map[g.member] ?? 0) + 1
-      else map.__none__ += 1
-    }
-    return map
-  }, [garments])
+  }, [scoped])
 
   return (
     <>
       <header className="page-head">
         <div>
-          <h1>我的衣服</h1>
+          <h1>
+            {activeMember === '__all__'
+              ? '我的衣服'
+              : activeMember === '__none__'
+                ? '未分类'
+                : `${activeMember}的衣柜`}
+          </h1>
           <p className="sub">
-            {visible.length === garments.length
-              ? `共 ${garments.length} 件`
-              : `筛出 ${visible.length} 件 / 共 ${garments.length} 件`}
+            {filtered.length === scoped.length
+              ? `共 ${scoped.length} 件`
+              : `筛出 ${filtered.length} 件 / 共 ${scoped.length} 件`}
           </p>
         </div>
         <button className="btn small primary" onClick={() => navigate('/add')}>
@@ -88,6 +83,11 @@ export function WardrobePage() {
           </button>
         </div>
       ) : null}
+
+      <div className="wardrobe-switch-row">
+        <WardrobeSwitcher />
+        <span className="note">切换后，新增的衣服会自动归到这个衣柜</span>
+      </div>
 
       <div className="search">
         <span className="glass" aria-hidden>
@@ -106,34 +106,6 @@ export function WardrobePage() {
           </button>
         ) : null}
       </div>
-
-      {memberOptions.length > 0 ? (
-        <div className="chips member-chips" aria-label="按归属筛选">
-          <button className={`chip ${member === 'all' ? 'active' : ''}`} onClick={() => setMember('all')}>
-            👨‍👩‍👧 全部
-            <span className="count">{memberCounts.all}</span>
-          </button>
-          {memberOptions.map((name) => (
-            <button
-              key={name}
-              className={`chip ${member === name ? 'active' : ''}`}
-              onClick={() => setMember(name)}
-            >
-              {name}
-              <span className="count">{memberCounts[name] ?? 0}</span>
-            </button>
-          ))}
-          {memberCounts.__none__ ? (
-            <button
-              className={`chip ${member === '__none__' ? 'active' : ''}`}
-              onClick={() => setMember('__none__')}
-            >
-              未分类
-              <span className="count">{memberCounts.__none__}</span>
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
       <CategoryChips value={category} onChange={setCategory} counts={counts} />
       <StatusFilterChips value={status} onChange={setStatus} />
@@ -154,10 +126,22 @@ export function WardrobePage() {
 
       {sorted.length === 0 ? (
         <div className="empty">
-          <div className="big">{garments.length === 0 ? '👗' : '🔍'}</div>
-          <h3>{garments.length === 0 ? '还没有衣服' : '没有符合条件的衣服'}</h3>
-          <p>{garments.length === 0 ? '拍照录入第一件，系统会自动编号。' : '换个筛选条件或关键词试试。'}</p>
-          {garments.length === 0 ? (
+          <div className="big">{scoped.length === 0 ? '👗' : '🔍'}</div>
+          <h3>
+            {scoped.length === 0
+              ? activeMember === '__all__'
+                ? '还没有衣服'
+                : '这个衣柜还没有衣服'
+              : '没有符合条件的衣服'}
+          </h3>
+          <p>
+            {scoped.length === 0
+              ? activeMember === '__all__'
+                ? '拍照录入第一件，系统会自动编号。'
+                : `点下面添加，会自动归到「${activeMember === '__none__' ? '未分类' : activeMember}」。`
+              : '换个筛选条件或关键词试试。'}
+          </p>
+          {scoped.length === 0 ? (
             <button className="btn primary" onClick={() => navigate('/add')}>
               ＋ 添加衣服
             </button>
@@ -171,7 +155,7 @@ export function WardrobePage() {
         </div>
       )}
 
-      {garments.length > 0 ? (
+      {scoped.length > 0 ? (
         <button className="fab" onClick={() => navigate('/add')} aria-label="添加衣服">
           ＋ 添加衣服
         </button>
