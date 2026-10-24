@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GarmentForm, emptyFormValue, toInput, type GarmentFormValue } from '../components/GarmentForm'
 import { Toast } from '../components/Toast'
@@ -17,6 +17,13 @@ export function AddPage() {
   }))
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
+
+  // 页面刷新时 members 是异步加载的，加载完后把当前衣柜补成默认归属
+  useEffect(() => {
+    const activeName = members.find((m) => m.id === activeMember)?.name
+    if (!activeName) return
+    setValue((prev) => (prev.member ? prev : { ...prev, member: activeName }))
+  }, [members, activeMember])
   // 用 ref 记住「正在保存」，防止连点两次保存按钮创建出两件衣服
   const saving = useRef(false)
 
