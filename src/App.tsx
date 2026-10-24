@@ -6,17 +6,16 @@ import { AddPage } from './pages/AddPage'
 import { DetailPage } from './pages/DetailPage'
 import { HomePage } from './pages/HomePage'
 import { LaundryPage } from './pages/LaundryPage'
+import { LoginPage } from './pages/LoginPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { SharePage } from './pages/SharePage'
 import { WardrobePage } from './pages/WardrobePage'
 import { useWardrobe } from './store/wardrobe'
 
 export function App() {
-  const { ready, error, dismissError } = useWardrobe()
+  const { ready, authReady, session, error, dismissError } = useWardrobe()
   const location = useLocation()
   const [showError, setShowError] = useState(false)
-  const isShare = location.pathname.startsWith('/s/')
 
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -26,7 +25,21 @@ export function App() {
     setShowError(Boolean(error))
   }, [error])
 
-  if (!ready && !isShare) {
+  if (!authReady) {
+    return (
+      <div className="loading-screen">
+        <div className="spinner" />
+        <span>正在检查登录…</span>
+      </div>
+    )
+  }
+
+  // 登录门禁：没有登录就看不到任何衣柜内容（本机模式也不放行）
+  if (!session) {
+    return <LoginPage />
+  }
+
+  if (!ready) {
     return (
       <div className="loading-screen">
         <div className="spinner" />
@@ -37,8 +50,8 @@ export function App() {
 
   return (
     <div className="app-shell">
-      {isShare ? null : <TabBar />}
-      <main className={isShare ? 'app-main share-main' : 'app-main'}>
+      <TabBar />
+      <main className="app-main">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/wardrobe" element={<WardrobePage />} />
@@ -47,7 +60,6 @@ export function App() {
           <Route path="/add" element={<AddPage />} />
           <Route path="/item/:id" element={<DetailPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/s/:token" element={<SharePage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>

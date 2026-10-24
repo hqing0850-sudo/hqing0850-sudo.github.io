@@ -41,6 +41,8 @@ function loadDefaultImageMode(): ImageMode {
 
 interface WardrobeState {
   ready: boolean
+  /** 是否已经完成登录状态检查（避免刷新时闪一下登录页） */
+  authReady: boolean
   mode: Mode
   garments: Garment[]
   logs: WashLog[]
@@ -93,6 +95,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<WashLog[]>([])
   const [customAssets, setCustomAssets] = useState<CustomAsset[]>([])
   const [ready, setReady] = useState(false)
+  const [authReady, setAuthReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cloudBusy, setCloudBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -130,16 +133,29 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
     if (!config) {
       setClient(null)
       setSession(null)
+      setAuthReady(true)
       return
     }
+    setAuthReady(false)
     const supabase = createSupabaseClient(config)
     setClient(supabase)
     let active = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) setSession(data.session)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (active) {
+          setSession(data.session)
+          setAuthReady(true)
+        }
+      })
+      .catch(() => {
+        if (active) setAuthReady(true)
+      })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
+      if (active) {
+        setSession(next)
+        setAuthReady(true)
+      }
     })
     return () => {
       active = false
@@ -178,6 +194,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    setReady(false)
     void refresh()
   }, [refresh, repository])
 
@@ -421,6 +438,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<WardrobeState>(
     () => ({
       ready,
+      authReady,
       mode,
       garments,
       logs,
@@ -462,6 +480,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready,
+      authReady,
       mode,
       garments,
       logs,
