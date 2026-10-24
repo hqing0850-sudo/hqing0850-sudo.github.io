@@ -435,7 +435,8 @@ a {
 .card .thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--surface-2);
   display: block;
 }
 
@@ -658,9 +659,9 @@ a {
   padding: 0;
   font: inherit;
   color: inherit;
-  aspect-ratio: 4 / 3;
-  /* 手机上别让照片框占掉半屏，否则分类、名称这些字段要滑很远才能看到 */
-  max-height: 240px;
+  /* 衣服照片大多是竖着拍的，用竖框能少裁切、看得更全 */
+  aspect-ratio: 3 / 4;
+  max-height: 420px;
   border-radius: var(--radius);
   border: 1.5px dashed #cdc3b2;
   background: var(--surface-2);
@@ -673,7 +674,8 @@ a {
 .photo-drop img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--surface-2);
 }
 
 .photo-drop .hint {
@@ -716,7 +718,8 @@ a {
 .detail-cover img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--surface-2);
   display: block;
 }
 
