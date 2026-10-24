@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CARTOON_COLORS, cartoonDataUri, listCartoonAssets } from '../lib/cartoon'
 import { compressImage } from '../lib/image'
 import { useWardrobe } from '../store/wardrobe'
@@ -77,9 +77,6 @@ export function ImagePicker({
   onCustomFilePick: (blob: Blob, name: string) => void
 }) {
   const { customAssets, deleteCustomAsset } = useWardrobe()
-  const cameraRef = useRef<HTMLInputElement>(null)
-  const albumRef = useRef<HTMLInputElement>(null)
-  const customRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<Category>(category)
   const [compressing, setCompressing] = useState(false)
 
@@ -130,11 +127,7 @@ export function ImagePicker({
       {/* ---------- 真实照片 ---------- */}
       {mode === 'photo' ? (
         <div className="photo-picker">
-          <button
-            type="button"
-            className="photo-drop"
-            onClick={() => (photoPreview ? albumRef.current?.click() : cameraRef.current?.click())}
-          >
+          <label className="photo-drop" htmlFor={photoPreview ? 'photo-album' : 'photo-camera'}>
             {compressing ? (
               <span className="hint">
                 <span className="big">⏳</span>
@@ -148,14 +141,14 @@ export function ImagePicker({
                 点击拍照或从相册选择
               </span>
             )}
-          </button>
+          </label>
           <div className="photo-actions">
-            <button type="button" className="btn small" onClick={() => cameraRef.current?.click()}>
+            <label className="btn small" htmlFor="photo-camera">
               拍照
-            </button>
-            <button type="button" className="btn small" onClick={() => albumRef.current?.click()}>
+            </label>
+            <label className="btn small" htmlFor="photo-album">
               相册
-            </button>
+            </label>
             {photoPreview && onPhotoRemove ? (
               <button type="button" className="btn small ghost" onClick={onPhotoRemove}>
                 移除照片
@@ -171,9 +164,9 @@ export function ImagePicker({
         <div className="cartoon-picker">
           <div className="sub-head">
             <span>我的自定义图片</span>
-            <button type="button" className="btn small ghost" onClick={() => customRef.current?.click()}>
+            <label className="btn small ghost" htmlFor="custom-image">
               ＋ 上传自定义图片
-            </button>
+            </label>
           </div>
 
           {customPreview ? (
@@ -288,11 +281,11 @@ export function ImagePicker({
       ) : null}
 
       <input
-        ref={cameraRef}
+        id="photo-camera"
+        className="file-input-hidden"
         type="file"
         accept="image/*"
         capture="environment"
-        hidden
         onChange={(e) => {
           const file = e.target.files?.[0]
           if (file) onPhotoPick(file)
@@ -300,10 +293,10 @@ export function ImagePicker({
         }}
       />
       <input
-        ref={albumRef}
+        id="photo-album"
+        className="file-input-hidden"
         type="file"
         accept="image/*"
-        hidden
         onChange={(e) => {
           const file = e.target.files?.[0]
           if (file) onPhotoPick(file)
@@ -311,10 +304,10 @@ export function ImagePicker({
         }}
       />
       <input
-        ref={customRef}
+        id="custom-image"
+        className="file-input-hidden"
         type="file"
         accept="image/*"
-        hidden
         onChange={(e) => {
           const file = e.target.files?.[0]
           if (file) void handleCustomFile(file)

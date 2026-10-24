@@ -3,12 +3,16 @@ const QUALITY = 0.82
 
 async function loadBitmap(file: Blob): Promise<{ width: number; height: number; draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void; close: () => void }> {
   if (typeof createImageBitmap === 'function') {
-    const bitmap = await createImageBitmap(file)
-    return {
-      width: bitmap.width,
-      height: bitmap.height,
-      draw: (ctx, w, h) => ctx.drawImage(bitmap, 0, 0, w, h),
-      close: () => bitmap.close()
+    try {
+      const bitmap = await createImageBitmap(file)
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        draw: (ctx, w, h) => ctx.drawImage(bitmap, 0, 0, w, h),
+        close: () => bitmap.close()
+      }
+    } catch {
+      // 微信/鸿蒙上 createImageBitmap 可能对某些照片失败，退回 <img> 解码
     }
   }
 

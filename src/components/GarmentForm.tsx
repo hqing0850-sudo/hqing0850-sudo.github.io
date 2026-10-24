@@ -131,7 +131,26 @@ export function GarmentForm({
         displayMode: 'photo'
       })
     } catch {
-      patch({ photoError: '照片处理失败，请换一张试试' })
+      // 有些手机（尤其微信/鸿蒙）能选图但压缩失败；先退回原图预览，至少能保存
+      const preview = URL.createObjectURL(file)
+      const readable = await new Promise<boolean>((resolve) => {
+        const probe = new Image()
+        probe.onload = () => resolve(true)
+        probe.onerror = () => resolve(false)
+        probe.src = preview
+      })
+      if (readable) {
+        patch({
+          photo: file,
+          photoPreview: preview,
+          photoChanged: true,
+          photoError: null,
+          displayMode: 'photo'
+        })
+      } else {
+        URL.revokeObjectURL(preview)
+        patch({ photoError: '这张照片手机读不出来，请换一张 JPG 格式的照片' })
+      }
     } finally {
       setCompressing(false)
     }
@@ -185,6 +204,13 @@ export function GarmentForm({
   // 外层页面的提交处理不会被触发。提交交给父级 form 负责。
   return (
     <div className="garment-form">
+      {compressing ? <p className="note">正在处理照片，请稍等…</p> : null}
+      {value.photoError ? (
+        <p className="note" style={{ color: 'var(--danger)' }} role="alert">
+          {value.photoError}
+        </p>
+      ) : null}
+
       <ImagePicker
         mode={value.displayMode}
         category={value.category}
@@ -200,12 +226,6 @@ export function GarmentForm({
         onPhotoRemove={() => patch({ photo: null, photoPreview: null, photoChanged: true })}
         onCustomFilePick={(blob, name) => void handleCustomFile(blob, name)}
       />
-
-      {value.photoError ? (
-        <p className="note" style={{ color: 'var(--danger)' }}>
-          {value.photoError}
-        </p>
-      ) : null}
 
       <div className="field">
         <span className="field-label">分类</span>

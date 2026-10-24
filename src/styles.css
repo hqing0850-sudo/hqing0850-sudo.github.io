@@ -2126,3 +2126,15 @@ a {
   line-height: 1.6;
 }
 
+
+.file-input-hidden {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
