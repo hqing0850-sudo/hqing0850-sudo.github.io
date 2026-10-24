@@ -1927,3 +1927,54 @@ a {
   flex: 1;
 }
 
+
+.card {
+  cursor: pointer;
+  position: relative;
+}
+
+.card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(36, 33, 29, 0.58);
+  color: #fffdf9;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.card-delete:active {
+  transform: scale(0.94);
+}
+
+.confirm-sheet {
+  max-width: 340px;
+}
+
+.confirm-body {
+  padding: 22px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.confirm-body h2 {
+  font-size: 18px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.confirm-actions .btn {
+  flex: 1;
+}
+

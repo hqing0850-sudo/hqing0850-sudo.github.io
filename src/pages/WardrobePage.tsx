@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryChips, GarmentCard, StatusFilterChips, useFilteredGarments } from '../components/GarmentCard'
+import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
 import { WardrobeSwitcher } from '../components/WardrobeSwitcher'
 import { CATEGORIES } from '../types'
+import type { Garment } from '../types'
 
 type SortKey = 'newest' | 'code' | 'status'
 
@@ -22,12 +24,15 @@ const STATUS_ORDER: Record<string, number> = {
 }
 
 export function WardrobePage() {
-  const { garments, mode, ready, activeMember } = useWardrobe()
+  const { garments, mode, ready, activeMember, deleteGarment } = useWardrobe()
   const navigate = useNavigate()
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('newest')
+  const [pendingDelete, setPendingDelete] = useState<Garment | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
 
   const scoped = useMemo(() => {
     if (activeMember === '__all__') return garments
@@ -52,6 +57,20 @@ export function WardrobePage() {
     for (const g of scoped) base[g.category] += 1
     return base
   }, [scoped])
+
+  async function handleDelete() {
+    if (!pendingDelete) return
+    setDeleting(true)
+    try {
+      await deleteGarment(pendingDelete.id)
+      setToast({ message: `已删除 ${pendingDelete.code}`, tone: 'info' })
+      setPendingDelete(null)
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : '删除失败', tone: 'error' })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <>
@@ -150,7 +169,7 @@ export function WardrobePage() {
       ) : (
         <div className="grid">
           {sorted.map((garment) => (
-            <GarmentCard key={garment.id} garment={garment} />
+            <GarmentCard key={garment.id} garment={garment} onDelete={setPendingDelete} />
           ))}
         </div>
       )}
@@ -159,6 +178,38 @@ export function WardrobePage() {
         <button className="fab" onClick={() => navigate('/add')} aria-label="添加衣服">
           ＋ 添加衣服
         </button>
+      ) : null}
+
+      {pendingDelete ? (
+        <div
+          className="share-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!deleting) setPendingDelete(null)
+          }}
+        >
+          <div className="share-sheet confirm-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="confirm-body">
+              <h2>确定删除 {pendingDelete.code}？</h2>
+              <p className="note">
+                删除后照片和洗涤记录会一起移除，编号会作废，不能再恢复。
+              </p>
+              <div className="confirm-actions">
+                <button className="btn" onClick={() => setPendingDelete(null)} disabled={deleting}>
+                  否，取消
+                </button>
+                <button className="btn danger" onClick={() => void handleDelete()} disabled={deleting}>
+                  {deleting ? '删除中…' : '是，删除'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <Toast message={toast.message} tone={toast.tone} onDone={() => setToast(null)} />
       ) : null}
     </>
   )

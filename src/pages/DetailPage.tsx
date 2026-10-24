@@ -300,10 +300,10 @@ export function DetailPage() {
             </p>
             <div className="sheet-actions">
               <button className="btn" onClick={() => setConfirmDelete(false)} disabled={busy}>
-                取消
+                否，取消
               </button>
               <button className="btn danger" onClick={() => void handleDelete()} disabled={busy}>
-                {busy ? '删除中…' : '确认删除'}
+                {busy ? '删除中…' : '是，删除'}
               </button>
             </div>
           </div>
