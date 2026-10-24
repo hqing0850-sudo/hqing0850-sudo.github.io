@@ -133,14 +133,27 @@ export async function listShares(client: SupabaseClient, userId: string): Promis
   }))
 }
 
-/** 撤销分享：先删照片，再删记录 */
+/**
+ * 撤销分享：先删记录（链接立即失效），再尽力清理照片。
+ * 顺序很重要：照片清理失败不能影响“撤销”本身。
+ */
 export async function revokeShare(client: SupabaseClient, token: string): Promise<void> {
-  const { data: files } = await client.storage.from(SHARE_BUCKET).list(token, { limit: 1000 })
-  if (files?.length) {
-    await client.storage.from(SHARE_BUCKET).remove(files.map((file) => `${token}/${file.name}`))
-  }
-  const { error } = await client.from('wardrobe_shares').delete().eq('token', token)
+  const { data, error } = await client
+    .from('wardrobe_shares')
+    .delete()
+    .eq('token', token)
+    .select('token')
   if (error) throw new Error(`撤销失败：${error.message}`)
+  if (!data || data.length === 0) throw new Error('撤销失败：这条分享不存在或已经撤销')
+
+  try {
+    const { data: files } = await client.storage.from(SHARE_BUCKET).list(token, { limit: 1000 })
+    if (files?.length) {
+      await client.storage.from(SHARE_BUCKET).remove(files.map((file) => `${token}/${file.name}`))
+    }
+  } catch {
+    // 照片清理失败不影响撤销结果
+  }
 }
 
 /** 访客读取分享内容（不需要登录） */
@@ -154,7 +167,8 @@ export async function fetchShared(token: string): Promise<SharePayload | null> {
       Authorization: `Bearer ${config.anonKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ p_token: token })
+    body: JSON.stringify({ p_token: token }),
+    cache: 'no-store'
   })
   if (!response.ok) throw new Error('链接无效或已经失效')
   const data = (await response.json()) as SharePayload | null

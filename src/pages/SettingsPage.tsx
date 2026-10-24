@@ -71,6 +71,7 @@ export function SettingsPage() {
   const [toast, setToast] = useState<{ message: string; tone: Tone } | null>(null)
   const [localCount, setLocalCount] = useState<number | null>(null)
   const [shares, setShares] = useState<ShareRecord[]>([])
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareProgress, setShareProgress] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -259,7 +260,6 @@ export function SettingsPage() {
 
   async function handleRevokeShare(token: string) {
     if (!client) return
-    if (!confirm('撤销后这个链接会立刻失效，已上传的分享照片也会删除。确定撤销吗？')) return
     setShareBusy(true)
     try {
       await revokeShare(client, token)
@@ -269,6 +269,7 @@ export function SettingsPage() {
       notify(error instanceof Error ? error.message : '撤销失败', 'error')
     } finally {
       setShareBusy(false)
+      setConfirmRevoke(null)
     }
   }
 
@@ -506,21 +507,43 @@ export function SettingsPage() {
                       </span>
                     </div>
                     <div className="link">{`${window.location.origin}/s/${item.token}`}</div>
-                    <div className="row wrap">
-                      <button className="btn small" onClick={() => void copyShareLink(item.token)}>
-                        复制链接
-                      </button>
-                      <a className="btn small ghost" href={`/s/${item.token}`} target="_blank" rel="noreferrer">
-                        预览
-                      </a>
-                      <button
-                        className="btn small danger"
-                        onClick={() => void handleRevokeShare(item.token)}
-                        disabled={shareBusy}
-                      >
-                        撤销
-                      </button>
-                    </div>
+                    {confirmRevoke === item.token ? (
+                      <>
+                        <p className="note">撤销后这个链接立即失效，已上传的分享照片也会删除。</p>
+                        <div className="row wrap">
+                          <button
+                            className="btn small danger"
+                            onClick={() => void handleRevokeShare(item.token)}
+                            disabled={shareBusy}
+                          >
+                            {shareBusy ? '正在撤销…' : '确定撤销'}
+                          </button>
+                          <button
+                            className="btn small ghost"
+                            onClick={() => setConfirmRevoke(null)}
+                            disabled={shareBusy}
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="row wrap">
+                        <button className="btn small" onClick={() => void copyShareLink(item.token)}>
+                          复制链接
+                        </button>
+                        <a className="btn small ghost" href={`/s/${item.token}`} target="_blank" rel="noreferrer">
+                          预览
+                        </a>
+                        <button
+                          className="btn small danger"
+                          onClick={() => setConfirmRevoke(item.token)}
+                          disabled={shareBusy}
+                        >
+                          撤销
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
