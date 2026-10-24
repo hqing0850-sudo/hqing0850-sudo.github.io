@@ -60,26 +60,51 @@ async function readMembers(store: KeyValueStore): Promise<Member[]> {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
+function dedupeMembers(list: Member[]): Member[] {
+  const seen = new Set<string>()
+  const out: Member[] = []
+  for (const member of list) {
+    if (seen.has(member.name)) continue
+    seen.add(member.name)
+    out.push(member)
+  }
+  return out
+}
+
+/** 默认衣柜只种一次；并发调用也要串行，避免种出两份 */
+let membersLock: Promise<unknown> = Promise.resolve()
+
+function withMembersLock<T>(task: () => Promise<T>): Promise<T> {
+  const result = membersLock.then(task, task)
+  membersLock = result.then(
+    () => undefined,
+    () => undefined
+  )
+  return result
+}
+
 /** 第一次使用本机模式时补上默认衣柜；之后删光了也不会自动补 */
 async function ensureMembers(store: KeyValueStore): Promise<Member[]> {
-  const members = await readMembers(store)
-  const seeded = await store.get<boolean>(COLLECTION, MEMBERS_SEEDED)
-  if (seeded) return members
+  return withMembersLock(async () => {
+    const members = dedupeMembers(await readMembers(store))
+    const seeded = await store.get<boolean>(COLLECTION, MEMBERS_SEEDED)
+    if (seeded) return members
 
-  const garments = await readGarments(store)
-  const names = ['爸爸', '妈妈', '我', ...garments.map((g) => g.member ?? '')]
-  const seen = new Set(members.map((m) => m.name))
-  let order = members.length
-  for (const raw of names) {
-    const name = raw.trim()
-    if (!name || seen.has(name)) continue
-    seen.add(name)
-    order += 1
-    const member: Member = { id: newId(), name, sortOrder: order }
-    await store.set(MEMBERS, member.id, member)
-  }
-  await store.set(COLLECTION, MEMBERS_SEEDED, true)
-  return readMembers(store)
+    const garments = await readGarments(store)
+    const names = ['爸爸', '妈妈', '我', ...garments.map((g) => g.member ?? '')]
+    const seen = new Set(members.map((m) => m.name))
+    let order = members.length
+    for (const raw of names) {
+      const name = raw.trim()
+      if (!name || seen.has(name)) continue
+      seen.add(name)
+      order += 1
+      const member: Member = { id: newId(), name, sortOrder: order }
+      await store.set(MEMBERS, member.id, member)
+    }
+    await store.set(COLLECTION, MEMBERS_SEEDED, true)
+    return dedupeMembers(await readMembers(store))
+  })
 }
 
 async function resolveMember(

@@ -112,6 +112,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
     return members.some((m) => m.id === activeMemberId) ? activeMemberId : '__all__'
   }, [activeMemberId, members])
   const repoRef = useRef<WardrobeRepository>(createLocalRepository())
+  const refreshSeq = useRef(0)
 
   const mode: Mode = client && session ? 'cloud' : 'local'
 
@@ -147,24 +148,32 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   }, [config])
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeq.current
+    const repo = repoRef.current
     setLoading(true)
     try {
       const [nextGarments, nextLogs, nextAssets, nextMembers] = await Promise.all([
-        repoRef.current.listGarments(),
-        repoRef.current.listLogs(),
-        repoRef.current.listCustomAssets(),
-        repoRef.current.listMembers()
+        repo.listGarments(),
+        repo.listLogs(),
+        repo.listCustomAssets(),
+        repo.listMembers()
       ])
+      // 登录切换仓库时，旧仓库的慢请求可能晚到；只接受最新一次结果
+      if (seq !== refreshSeq.current || repo !== repoRef.current) return
       setGarments(nextGarments)
       setLogs(nextLogs)
       setCustomAssets(nextAssets)
       setMembers(nextMembers)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '读取数据失败')
+      if (seq === refreshSeq.current && repo === repoRef.current) {
+        setError(err instanceof Error ? err.message : '读取数据失败')
+      }
     } finally {
-      setLoading(false)
-      setReady(true)
+      if (seq === refreshSeq.current && repo === repoRef.current) {
+        setLoading(false)
+        setReady(true)
+      }
     }
   }, [])
 
