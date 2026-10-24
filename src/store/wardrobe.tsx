@@ -118,11 +118,14 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const refreshSeq = useRef(0)
 
   const mode: Mode = client && session ? 'cloud' : 'local'
+  const userId = session?.user.id ?? null
 
+  // 只按“用户 id”重建仓库；令牌刷新导致的 session 对象变化不应该重建，
+  // 否则每次切回前台都会把正在填写的页面清空。
   const repository = useMemo(() => {
-    if (client && session) return createCloudRepository(client)
+    if (client && userId) return createCloudRepository(client)
     return createLocalRepository()
-  }, [client, session])
+  }, [client, userId])
 
   useEffect(() => {
     repoRef.current = repository
