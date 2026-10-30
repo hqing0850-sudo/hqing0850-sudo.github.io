@@ -88,6 +88,12 @@ export function ImagePicker({
 
   const assets = listCartoonAssets(tab)
   const selectedAsset = customAssets.find((asset) => asset.id === customAssetId) ?? null
+  const availableModes = category === 'shoes' ? IMAGE_MODES.filter((item) => item !== 'cartoon') : IMAGE_MODES
+
+  // 鞋子暂时没有内置卡通图，如果默认是卡通就切回真实照片
+  useEffect(() => {
+    if (category === 'shoes' && mode === 'cartoon') onModeChange('photo')
+  }, [category, mode, onModeChange])
 
   async function handleCustomFile(file: File | undefined) {
     if (!file) return
@@ -106,7 +112,7 @@ export function ImagePicker({
       <span className="field-label">图片显示方式</span>
 
       <div className="mode-picker">
-        {IMAGE_MODES.map((item) => {
+        {availableModes.map((item) => {
           const meta = IMAGE_MODE_META[item]
           return (
             <button
@@ -124,6 +130,9 @@ export function ImagePicker({
           )
         })}
       </div>
+      {category === 'shoes' ? (
+        <p className="note">鞋子暂时没有内置卡通图，可以用真实照片，或者选“隐藏图片”。</p>
+      ) : null}
 
       {/* ---------- 真实照片 ---------- */}
       {mode === 'photo' ? (
@@ -218,7 +227,7 @@ export function ImagePicker({
             <span>内置卡通素材库</span>
           </div>
           <div className="chips" role="tablist" aria-label="卡通素材分类">
-            {CATEGORIES.map((item) => (
+            {CATEGORIES.filter((item) => item !== 'shoes').map((item) => (
               <button
                 type="button"
                 key={item}

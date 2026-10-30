@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ImagePicker } from './ImagePicker'
 import { compressImage } from '../lib/image'
 import { savePendingPhoto, clearPendingPhoto } from '../lib/pendingPhoto'
+import { codeLikeCategory } from '../lib/numbering'
 import {
   CATEGORIES,
   CATEGORY_META,
@@ -206,7 +207,14 @@ export function GarmentForm({
     ) {
       return
     }
-    patch({ category })
+    // 切换分类时，别把旧分类的“上衣006”这种编号式名称带过去
+    const staleCodeName = codeLikeCategory(value.name) !== null
+    const nextMode = category === 'shoes' && value.displayMode === 'cartoon' ? 'photo' : value.displayMode
+    patch({
+      category,
+      displayMode: nextMode,
+      ...(staleCodeName ? { name: '' } : {})
+    })
   }
 
   // 注意：这里不能再套一层 <form>，否则保存按钮会提交内层表单，

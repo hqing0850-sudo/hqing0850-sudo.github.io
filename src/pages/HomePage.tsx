@@ -86,6 +86,10 @@ export function HomePage() {
           <div className="n">{stats.byCategory.pants}</div>
           <div className="k">{CATEGORY_META.pants.emoji} 裤子</div>
         </div>
+        <div className="stat">
+          <div className="n">{stats.byCategory.shoes}</div>
+          <div className="k">{CATEGORY_META.shoes.emoji} 鞋子</div>
+        </div>
       </div>
 
       {stats.dirty > 0 ? (

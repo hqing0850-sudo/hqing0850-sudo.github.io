@@ -3,11 +3,15 @@ import { CARTOON_COLORS, CARTOON_TEMPLATES, cartoonDataUri, cartoonSvg, listCart
 import { CATEGORIES } from '../types'
 
 describe('卡通素材库', () => {
-  it('每个分类都有多种款式', () => {
-    for (const category of CATEGORIES) {
+  it('上衣、外套、裤子都有多种款式', () => {
+    for (const category of CATEGORIES.filter((item) => item !== 'shoes')) {
       const templates = CARTOON_TEMPLATES.filter((t) => t.category === category)
       expect(templates.length).toBeGreaterThanOrEqual(5)
     }
+  })
+
+  it('鞋子暂时没有内置卡通图', () => {
+    expect(listCartoonAssets('shoes')).toHaveLength(0)
   })
 
   it('每种款式都有多种颜色', () => {

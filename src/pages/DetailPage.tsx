@@ -38,6 +38,7 @@ export function DetailPage() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteText, setDeleteText] = useState('')
   // 用 ref 记住「正在保存」，防止连点两次保存按钮
   const saving = useRef(false)
 
@@ -127,6 +128,7 @@ export function DetailPage() {
 
   async function handleDelete() {
     if (!garment) return
+    if (deleteText.trim() !== garment.code) return
     setBusy(true)
     try {
       await deleteGarment(garment.id)
@@ -298,7 +300,13 @@ export function DetailPage() {
           ) : null}
 
           <div className="row" style={{ marginTop: 24 }}>
-            <button className="btn danger grow" onClick={() => setConfirmDelete(true)}>
+            <button
+              className="btn danger grow"
+              onClick={() => {
+                setDeleteText('')
+                setConfirmDelete(true)
+              }}
+            >
               删除这件衣服
             </button>
           </div>
@@ -313,12 +321,30 @@ export function DetailPage() {
               删除后照片和洗涤记录会一起移除，编号 {garment.code} 会被永久作废、以后不会再分配给别人。
               此操作无法撤销。
             </p>
+            <label className="field">
+              <span className="field-label">请输入编号「{garment.code}」确认</span>
+              <input
+                className="input"
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                placeholder={garment.code}
+                autoFocus
+                autoComplete="off"
+              />
+            </label>
+            <p className="note" style={{ color: 'var(--danger)' }}>
+              输错一个字都不能删除。
+            </p>
             <div className="sheet-actions">
               <button className="btn" onClick={() => setConfirmDelete(false)} disabled={busy}>
                 否，取消
               </button>
-              <button className="btn danger" onClick={() => void handleDelete()} disabled={busy}>
-                {busy ? '删除中…' : '是，删除'}
+              <button
+                className="btn danger"
+                onClick={() => void handleDelete()}
+                disabled={busy || deleteText.trim() !== garment.code}
+              >
+                {busy ? '删除中…' : '删除'}
               </button>
             </div>
           </div>

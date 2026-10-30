@@ -32,6 +32,8 @@ begin
     prefix := '外套';
   elsif p_category = 'pants' then
     prefix := '裤子';
+  elsif p_category = 'shoes' then
+    prefix := '鞋子';
   else
     raise exception '未知分类: %', p_category;
   end if;
@@ -60,7 +62,7 @@ create table if not exists public.garments (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   code text not null,
-  category text not null check (category in ('top', 'outerwear', 'pants')),
+  category text not null check (category in ('top', 'outerwear', 'pants', 'shoes')),
   member text not null default '',
   name text not null default '',
   color text not null default '',

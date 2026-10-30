@@ -4,6 +4,7 @@ import { GarmentForm, emptyFormValue, toInput, type GarmentFormValue } from '../
 import { Toast } from '../components/Toast'
 import { useWardrobe } from '../store/wardrobe'
 import { clearPendingPhoto, loadPendingPhoto } from '../lib/pendingPhoto'
+import { codeLikeCategory } from '../lib/numbering'
 
 const DRAFT_KEY = 'wardrobe.addDraft'
 
@@ -12,7 +13,13 @@ function loadDraft(): Partial<GarmentFormValue> | null {
     const raw = sessionStorage.getItem(DRAFT_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? (parsed as Partial<GarmentFormValue>) : null
+    if (!parsed || typeof parsed !== 'object') return null
+    const draft = parsed as Partial<GarmentFormValue>
+    // 旧草稿可能把上一件上衣的名称“上衣006”带到了外套里，这里清掉
+    if (draft.name && codeLikeCategory(draft.name) && codeLikeCategory(draft.name) !== draft.category) {
+      draft.name = ''
+    }
+    return draft
   } catch {
     return null
   }
@@ -109,6 +116,9 @@ export function AddPage() {
       }
 
       const input = toInput(value)
+      if (input.name && codeLikeCategory(input.name) && codeLikeCategory(input.name) !== input.category) {
+        input.name = ''
+      }
       const memberName = (input.member ?? '').trim()
       let memberId: string | null = null
       if (memberName) {

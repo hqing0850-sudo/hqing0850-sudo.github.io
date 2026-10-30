@@ -1,10 +1,11 @@
-export const CATEGORIES = ['top', 'outerwear', 'pants'] as const
+export const CATEGORIES = ['top', 'outerwear', 'pants', 'shoes'] as const
 export type Category = (typeof CATEGORIES)[number]
 
 export const CATEGORY_META: Record<Category, { label: string; prefix: string; emoji: string }> = {
   top: { label: '上衣', prefix: '上衣', emoji: '👕' },
   outerwear: { label: '外套', prefix: '外套', emoji: '🧥' },
-  pants: { label: '裤子', prefix: '裤子', emoji: '👖' }
+  pants: { label: '裤子', prefix: '裤子', emoji: '👖' },
+  shoes: { label: '鞋子', prefix: '鞋子', emoji: '👟' }
 }
 
 export const WASH_STATUSES = ['clean', 'to_wash', 'washing', 'drying', 'stored'] as const
@@ -152,6 +153,6 @@ export interface ExportBundle {
   customAssets?: CustomAsset[]
 }
 
-export const CATEGORY_ORDER: Record<Category, number> = { top: 1, outerwear: 2, pants: 3 }
+export const CATEGORY_ORDER: Record<Category, number> = { top: 1, outerwear: 2, pants: 3, shoes: 4 }
 
 export const ALL_CATEGORY_LABEL = '全部'

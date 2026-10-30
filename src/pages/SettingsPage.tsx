@@ -5,7 +5,7 @@ import { findCodeMismatches } from '../data/localRepository'
 import { formatCode, maxSequenceFromCodes, smallestFreeSequence, usedSequences } from '../lib/numbering'
 import { usePwaInstall } from '../lib/pwa'
 import { useWardrobe } from '../store/wardrobe'
-import { CATEGORY_META, IMAGE_MODES, IMAGE_MODE_META } from '../types'
+import { CATEGORIES, CATEGORY_META, IMAGE_MODES, IMAGE_MODE_META } from '../types'
 import type { ExportBundle } from '../types'
 
 type Tone = 'info' | 'error'
@@ -71,7 +71,7 @@ export function SettingsPage() {
   // 各分类当前占用到的编号，方便核对编号是否正常
   const sequenceInfo = useMemo(() => {
     const codes = garments.map((g) => g.code)
-    return (['top', 'outerwear', 'pants'] as const).map((category) => ({
+    return CATEGORIES.map((category) => ({
       category,
       used: usedSequences(category, codes).size,
       max: maxSequenceFromCodes(category, codes),

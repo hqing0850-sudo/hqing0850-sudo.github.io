@@ -3,10 +3,11 @@ import type { Category } from '../types'
 const CATEGORY_PREFIX: Record<Category, string> = {
   top: '上衣',
   outerwear: '外套',
-  pants: '裤子'
+  pants: '裤子',
+  shoes: '鞋子'
 }
 
-export const CATEGORIES_ORDER: Category[] = ['top', 'outerwear', 'pants']
+export const CATEGORIES_ORDER: Category[] = ['top', 'outerwear', 'pants', 'shoes']
 
 /** 把计数转成至少三位的编号，如 1 -> 001，1234 -> 1234 */
 export function formatCode(category: Category, seq: number): string {
@@ -77,4 +78,16 @@ export function maxSequenceFromCodes(category: Category, codes: string[]): numbe
 
 export function categoryPrefix(category: Category): string {
   return CATEGORY_PREFIX[category]
+}
+
+/** 名称如果本身就是“上衣006/外套001”这种编号，返回它属于哪个分类 */
+export function codeLikeCategory(name: string): Category | null {
+  const trimmed = name.trim()
+  for (const category of CATEGORIES_ORDER) {
+    const prefix = CATEGORY_PREFIX[category]
+    if (trimmed.startsWith(prefix) && /^\d+$/.test(trimmed.slice(prefix.length))) {
+      return category
+    }
+  }
+  return null
 }
