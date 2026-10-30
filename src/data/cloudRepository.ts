@@ -10,6 +10,9 @@ import type {
   ImageMode,
   Member,
   NewGarmentInput,
+  NewOutfitInput,
+  Outfit,
+  OutfitPatch,
   WashLog,
   WashStatus
 } from '../types'
@@ -99,6 +102,18 @@ type AssetRow = {
   created_at: string
 }
 
+type OutfitRow = {
+  id: string
+  name: string | null
+  notes: string | null
+  top_id: string
+  outerwear_id: string | null
+  pants_id: string
+  shoes_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 const toMillis = (value: string | null): number | null => (value ? new Date(value).getTime() : null)
 
 function rowToGarment(row: GarmentRow): Garment {
@@ -136,6 +151,20 @@ function rowToLog(row: LogRow): WashLog {
     fromStatus: row.from_status,
     toStatus: row.to_status,
     at: toMillis(row.at) ?? Date.now()
+  }
+}
+
+function rowToOutfit(row: OutfitRow): Outfit {
+  return {
+    id: row.id,
+    name: row.name ?? '',
+    notes: row.notes ?? '',
+    topId: row.top_id,
+    outerwearId: row.outerwear_id ?? null,
+    pantsId: row.pants_id,
+    shoesId: row.shoes_id ?? null,
+    createdAt: toMillis(row.created_at) ?? Date.now(),
+    updatedAt: toMillis(row.updated_at) ?? Date.now()
   }
 }
 
@@ -217,6 +246,15 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
       .order('created_at', { ascending: false })
     if (error) throw new Error(`读取自定义图片失败：${error.message}`)
     return (data as AssetRow[]).map(rowToAsset)
+  }
+
+  async function listOutfits(): Promise<Outfit[]> {
+    const { data, error } = await client
+      .from('outfits')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(`读取搭配失败：${error.message}`)
+    return (data as OutfitRow[]).map(rowToOutfit)
   }
 
   /**
@@ -347,8 +385,58 @@ export function createCloudRepository(client: SupabaseClient): WardrobeRepositor
     async deleteGarment(id: string) {
       const { data } = await client.from('garments').select('photo_path').eq('id', id).single()
       const { error } = await client.from('garments').delete().eq('id', id)
-      if (error) throw new Error(`删除失败：${error.message}`)
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error('这件衣服正在被搭配使用，请先去「搭配」里删除相关搭配')
+        }
+        throw new Error(`删除失败：${error.message}`)
+      }
       await removePhoto((data as { photo_path: string | null } | null)?.photo_path ?? null)
+    },
+
+    async listOutfits() {
+      return listOutfits()
+    },
+
+    async createOutfit(input: NewOutfitInput) {
+      const userId = await requireUserId()
+      const now = new Date().toISOString()
+      const { data, error } = await client
+        .from('outfits')
+        .insert({
+          id: newId(),
+          user_id: userId,
+          name: input.name.trim(),
+          notes: input.notes.trim(),
+          top_id: input.topId,
+          outerwear_id: input.outerwearId,
+          pants_id: input.pantsId,
+          shoes_id: input.shoesId,
+          created_at: now,
+          updated_at: now
+        })
+        .select('*')
+        .single()
+      if (error) throw new Error(`保存搭配失败：${error.message}`)
+      return rowToOutfit(data as OutfitRow)
+    },
+
+    async updateOutfit(id: string, patch: OutfitPatch) {
+      const updates: Record<string, string | null> = { updated_at: new Date().toISOString() }
+      if (patch.name !== undefined) updates.name = patch.name.trim()
+      if (patch.notes !== undefined) updates.notes = patch.notes.trim()
+      if (patch.topId !== undefined) updates.top_id = patch.topId
+      if (patch.outerwearId !== undefined) updates.outerwear_id = patch.outerwearId
+      if (patch.pantsId !== undefined) updates.pants_id = patch.pantsId
+      if (patch.shoesId !== undefined) updates.shoes_id = patch.shoesId
+      const { data, error } = await client.from('outfits').update(updates).eq('id', id).select('*').single()
+      if (error) throw new Error(`更新搭配失败：${error.message}`)
+      return rowToOutfit(data as OutfitRow)
+    },
+
+    async deleteOutfit(id: string) {
+      const { error } = await client.from('outfits').delete().eq('id', id)
+      if (error) throw new Error(`删除搭配失败：${error.message}`)
     },
 
     async setWashStatus(id: string, status: WashStatus) {

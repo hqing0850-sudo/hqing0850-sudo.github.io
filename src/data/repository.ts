@@ -5,6 +5,9 @@ import type {
   GarmentPatch,
   Member,
   NewGarmentInput,
+  NewOutfitInput,
+  Outfit,
+  OutfitPatch,
   WashLog,
   WashStatus
 } from '../types'
@@ -15,6 +18,10 @@ export interface WardrobeRepository {
   createGarment(input: NewGarmentInput): Promise<Garment>
   updateGarment(id: string, patch: GarmentPatch, photo?: Blob | null): Promise<Garment>
   deleteGarment(id: string): Promise<void>
+  listOutfits(): Promise<Outfit[]>
+  createOutfit(input: NewOutfitInput): Promise<Outfit>
+  updateOutfit(id: string, patch: OutfitPatch): Promise<Outfit>
+  deleteOutfit(id: string): Promise<void>
   setWashStatus(id: string, status: WashStatus): Promise<Garment>
   listLogs(): Promise<WashLog[]>
   clearLogs(): Promise<void>

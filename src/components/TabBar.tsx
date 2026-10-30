@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const TABS = [
   { to: '/', label: '首页', icon: '🏠', end: true },
   { to: '/wardrobe', label: '我的衣服', icon: '👚', end: false },
+  { to: '/outfits', label: '搭配', icon: '👗', end: false },
   { to: '/laundry', label: '洗衣记录', icon: '🧺', end: false },
   { to: '/settings', label: '设置', icon: '⚙️', end: false }
 ]

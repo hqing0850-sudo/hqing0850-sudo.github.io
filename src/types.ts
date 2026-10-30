@@ -107,6 +107,32 @@ export interface WashLog {
   at: number
 }
 
+/** 一套搭配：上衣 + 裤子必选，外套和鞋子可选 */
+export interface Outfit {
+  id: string
+  name: string
+  notes: string
+  topId: string
+  outerwearId: string | null
+  pantsId: string
+  shoesId: string | null
+  createdAt: number
+  updatedAt: number
+}
+
+export type NewOutfitInput = {
+  name: string
+  notes: string
+  topId: string
+  outerwearId: string | null
+  pantsId: string
+  shoesId: string | null
+}
+
+export type OutfitPatch = Partial<
+  Pick<Outfit, 'name' | 'notes' | 'topId' | 'outerwearId' | 'pantsId' | 'shoesId'>
+>
+
 export type NewGarmentInput = {
   category: Category
   /** 归属衣柜的内部编号 */
@@ -148,6 +174,7 @@ export interface ExportBundle {
   version: 1
   exportedAt: string
   garments: Garment[]
+  outfits?: Outfit[]
   logs: WashLog[]
   photos: { path: string; dataUrl: string }[]
   customAssets?: CustomAsset[]

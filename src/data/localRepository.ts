@@ -7,16 +7,21 @@ import type {
   GarmentPatch,
   Member,
   NewGarmentInput,
+  NewOutfitInput,
+  Outfit,
+  OutfitPatch,
   WashLog,
   WashStatus
 } from '../types'
 import { idbStore, type KeyValueStore } from './idb'
 import { buildLog, type WardrobeRepository } from './repository'
+import { outfitGarmentIds } from '../lib/outfits'
 
 const COLLECTION = 'local'
 const GARMENTS = 'garments'
 const LOGS = 'logs'
 const ASSETS = 'customAssets'
+const OUTFITS = 'outfits'
 const MEMBERS = 'members'
 const MEMBERS_SEEDED = 'membersSeeded'
 /** 图片的存放键：真实照片是 photo:<衣服id>，自定义素材是 custom:<素材id> */
@@ -51,6 +56,11 @@ function normalizeGarment(garment: Garment): Garment {
     cartoonId: garment.cartoonId ?? null,
     customAssetId: garment.customAssetId ?? null
   }
+}
+
+async function readOutfits(store: KeyValueStore): Promise<Outfit[]> {
+  const rows = await store.list<Outfit>(OUTFITS)
+  return rows.map((row) => row.value).sort((a, b) => b.createdAt - a.createdAt)
 }
 
 async function readMembers(store: KeyValueStore): Promise<Member[]> {
@@ -256,6 +266,10 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
     },
 
     async deleteGarment(id: string) {
+      const outfits = await readOutfits(store)
+      if (outfits.some((outfit) => outfitGarmentIds(outfit).includes(id))) {
+        throw new Error('这件衣服正在被搭配使用，请先去「搭配」里删除相关搭配')
+      }
       const current = await store.get<Garment>(GARMENTS, id)
       if (current?.photoPath) {
         await store.remove(COLLECTION, current.photoPath)
@@ -319,6 +333,45 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
       await store.remove(ASSETS, id)
     },
 
+    async listOutfits() {
+      return readOutfits(store)
+    },
+
+    async createOutfit(input: NewOutfitInput) {
+      const now = Date.now()
+      const outfit: Outfit = {
+        id: newId(),
+        name: input.name.trim(),
+        notes: input.notes.trim(),
+        topId: input.topId,
+        outerwearId: input.outerwearId,
+        pantsId: input.pantsId,
+        shoesId: input.shoesId,
+        createdAt: now,
+        updatedAt: now
+      }
+      await store.set(OUTFITS, outfit.id, outfit)
+      return outfit
+    },
+
+    async updateOutfit(id: string, patch: OutfitPatch) {
+      const current = await store.get<Outfit>(OUTFITS, id)
+      if (!current) throw new Error('搭配不存在')
+      const next: Outfit = {
+        ...current,
+        ...patch,
+        name: patch.name !== undefined ? patch.name.trim() : current.name,
+        notes: patch.notes !== undefined ? patch.notes.trim() : current.notes,
+        updatedAt: Date.now()
+      }
+      await store.set(OUTFITS, id, next)
+      return next
+    },
+
+    async deleteOutfit(id: string) {
+      await store.remove(OUTFITS, id)
+    },
+
     async listMembers() {
       return ensureMembers(store)
     },
@@ -356,8 +409,13 @@ export function createLocalRepository(store: KeyValueStore = idbStore): Wardrobe
       let deleted = 0
       if (deleteClothes) {
         const garments = await readGarments(store)
-        for (const garment of garments) {
-          if (garment.memberId !== id) continue
+        const memberGarments = garments.filter((garment) => garment.memberId === id)
+        const ids = new Set(memberGarments.map((garment) => garment.id))
+        const outfits = await readOutfits(store)
+        if (outfits.some((outfit) => outfitGarmentIds(outfit).some((garmentId) => ids.has(garmentId)))) {
+          throw new Error('衣柜里有衣服正在被搭配使用，请先去「搭配」里删除相关搭配')
+        }
+        for (const garment of memberGarments) {
           if (garment.photoPath) await store.remove(COLLECTION, garment.photoPath)
           await store.remove(GARMENTS, garment.id)
           deleted += 1

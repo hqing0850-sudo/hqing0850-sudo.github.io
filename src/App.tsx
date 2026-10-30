@@ -7,6 +7,8 @@ import { DetailPage } from './pages/DetailPage'
 import { HomePage } from './pages/HomePage'
 import { LaundryPage } from './pages/LaundryPage'
 import { LoginPage } from './pages/LoginPage'
+import { OutfitEditPage } from './pages/OutfitEditPage'
+import { OutfitsPage } from './pages/OutfitsPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WardrobePage } from './pages/WardrobePage'
@@ -71,6 +73,9 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/wardrobe" element={<WardrobePage />} />
+          <Route path="/outfits" element={<OutfitsPage />} />
+          <Route path="/outfits/new" element={<OutfitEditPage />} />
+          <Route path="/outfits/:id/edit" element={<OutfitEditPage />} />
           <Route path="/laundry" element={<LaundryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/add" element={<AddPage />} />

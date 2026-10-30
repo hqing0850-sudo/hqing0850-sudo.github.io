@@ -422,3 +422,60 @@ $$;
 revoke all on function public.delete_wardrobe(text, boolean) from public;
 grant execute on function public.delete_wardrobe(text, boolean) to authenticated;
 
+
+
+-- ---------- 9. 搭配 ----------
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'garments_user_id_id_key'
+  ) then
+    alter table public.garments
+      add constraint garments_user_id_id_key unique (user_id, id);
+  end if;
+end $$;
+
+create table if not exists public.outfits (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null default '',
+  notes text not null default '',
+  top_id text not null,
+  outerwear_id text,
+  pants_id text not null,
+  shoes_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint outfits_top_fk foreign key (user_id, top_id)
+    references public.garments(user_id, id) on delete restrict,
+  constraint outfits_outerwear_fk foreign key (user_id, outerwear_id)
+    references public.garments(user_id, id) on delete restrict,
+  constraint outfits_pants_fk foreign key (user_id, pants_id)
+    references public.garments(user_id, id) on delete restrict,
+  constraint outfits_shoes_fk foreign key (user_id, shoes_id)
+    references public.garments(user_id, id) on delete restrict
+);
+
+create index if not exists outfits_user_created_idx on public.outfits (user_id, created_at desc);
+create index if not exists outfits_top_idx on public.outfits (top_id);
+create index if not exists outfits_pants_idx on public.outfits (pants_id);
+
+alter table public.outfits enable row level security;
+
+drop policy if exists "outfits_select_own" on public.outfits;
+create policy "outfits_select_own" on public.outfits
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "outfits_insert_own" on public.outfits;
+create policy "outfits_insert_own" on public.outfits
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "outfits_update_own" on public.outfits;
+create policy "outfits_update_own" on public.outfits
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "outfits_delete_own" on public.outfits;
+create policy "outfits_delete_own" on public.outfits
+  for delete using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.outfits to authenticated;

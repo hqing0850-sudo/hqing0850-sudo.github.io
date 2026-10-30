@@ -5,6 +5,7 @@ import { GarmentForm, formValueFromGarment, toInput, type GarmentFormValue } fro
 import { StatusBadge } from '../components/StatusBadge'
 import { Toast } from '../components/Toast'
 import { formatDateTime, daysSince } from '../lib/format'
+import { outfitName, outfitsUsingGarment } from '../lib/outfits'
 import { useWardrobe } from '../store/wardrobe'
 import {
   CATEGORY_META,
@@ -14,7 +15,7 @@ import {
   WASH_STATUSES,
   WASH_STATUS_META
 } from '../types'
-import type { GarmentPatch, WashStatus } from '../types'
+import type { GarmentPatch, Outfit, WashStatus } from '../types'
 
 export function DetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +23,7 @@ export function DetailPage() {
   const navigate = useNavigate()
   const {
     garments,
+    outfits,
     logs,
     updateGarment,
     deleteGarment,
@@ -39,6 +41,7 @@ export function DetailPage() {
   const [toast, setToast] = useState<{ message: string; tone: 'info' | 'error' } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteText, setDeleteText] = useState('')
+  const [blockedOutfits, setBlockedOutfits] = useState<Outfit[] | null>(null)
   // 用 ref 记住「正在保存」，防止连点两次保存按钮
   const saving = useRef(false)
 
@@ -303,6 +306,12 @@ export function DetailPage() {
             <button
               className="btn danger grow"
               onClick={() => {
+                if (!garment) return
+                const using = outfitsUsingGarment(outfits, garment.id)
+                if (using.length > 0) {
+                  setBlockedOutfits(using)
+                  return
+                }
                 setDeleteText('')
                 setConfirmDelete(true)
               }}
@@ -312,6 +321,39 @@ export function DetailPage() {
           </div>
         </div>
       </div>
+
+      {blockedOutfits ? (
+        <div className="sheet-backdrop" onClick={() => setBlockedOutfits(null)}>
+          <div className="share-sheet confirm-sheet" onClick={(event) => event.stopPropagation()}>
+            <h2>这件衣服正在被搭配使用</h2>
+            <p className="sheet-desc">
+              不能删除。请先在下面这些搭配里把它换掉或删除搭配：
+            </p>
+            <div className="blocked-outfits">
+              {blockedOutfits.map((outfit) => (
+                <div className="blocked-outfit" key={outfit.id}>
+                  <strong>{outfitName(outfit, garments)}</strong>
+                  <span>{outfit.notes || '没有备注'}</span>
+                </div>
+              ))}
+            </div>
+            <div className="sheet-actions">
+              <button className="btn" onClick={() => setBlockedOutfits(null)}>
+                知道了
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setBlockedOutfits(null)
+                  navigate('/outfits')
+                }}
+              >
+                去搭配页
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirmDelete ? (
         <div className="sheet-backdrop" onClick={() => setConfirmDelete(false)}>

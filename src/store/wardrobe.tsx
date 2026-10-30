@@ -17,6 +17,9 @@ import type {
   ImageMode,
   Member,
   NewGarmentInput,
+  NewOutfitInput,
+  Outfit,
+  OutfitPatch,
   WashLog,
   WashStatus
 } from '../types'
@@ -45,6 +48,7 @@ interface WardrobeState {
   authReady: boolean
   mode: Mode
   garments: Garment[]
+  outfits: Outfit[]
   logs: WashLog[]
   customAssets: CustomAsset[]
   loading: boolean
@@ -66,6 +70,9 @@ interface WardrobeState {
   createGarment: (input: NewGarmentInput) => Promise<Garment>
   updateGarment: (id: string, patch: GarmentPatch, photo?: Blob | null) => Promise<void>
   deleteGarment: (id: string) => Promise<void>
+  createOutfit: (input: NewOutfitInput) => Promise<Outfit>
+  updateOutfit: (id: string, patch: OutfitPatch) => Promise<void>
+  deleteOutfit: (id: string) => Promise<void>
   setWashStatus: (id: string, status: WashStatus) => Promise<void>
   clearLogs: () => Promise<void>
   connectCloud: (config: SupabaseConfig) => void
@@ -92,6 +99,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<SupabaseClient | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [garments, setGarments] = useState<Garment[]>([])
+  const [outfits, setOutfits] = useState<Outfit[]>([])
   const [logs, setLogs] = useState<WashLog[]>([])
   const [customAssets, setCustomAssets] = useState<CustomAsset[]>([])
   const [ready, setReady] = useState(false)
@@ -171,8 +179,9 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
     const repo = repoRef.current
     setLoading(true)
     try {
-      const [nextGarments, nextLogs, nextAssets, nextMembers] = await Promise.all([
+      const [nextGarments, nextOutfits, nextLogs, nextAssets, nextMembers] = await Promise.all([
         repo.listGarments(),
+        repo.listOutfits(),
         repo.listLogs(),
         repo.listCustomAssets(),
         repo.listMembers()
@@ -180,6 +189,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       // 登录切换仓库时，旧仓库的慢请求可能晚到；只接受最新一次结果
       if (seq !== refreshSeq.current || repo !== repoRef.current) return
       setGarments(nextGarments)
+      setOutfits(nextOutfits)
       setLogs(nextLogs)
       setCustomAssets(nextAssets)
       setMembers(nextMembers)
@@ -215,6 +225,22 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
   const deleteGarment = useCallback(async (id: string) => {
     await repoRef.current.deleteGarment(id)
     setGarments((prev) => prev.filter((g) => g.id !== id))
+  }, [])
+
+  const createOutfit = useCallback(async (input: NewOutfitInput) => {
+    const created = await repoRef.current.createOutfit(input)
+    setOutfits((prev) => [created, ...prev])
+    return created
+  }, [])
+
+  const updateOutfit = useCallback(async (id: string, patch: OutfitPatch) => {
+    const updated = await repoRef.current.updateOutfit(id, patch)
+    setOutfits((prev) => prev.map((outfit) => (outfit.id === id ? updated : outfit)))
+  }, [])
+
+  const deleteOutfit = useCallback(async (id: string) => {
+    await repoRef.current.deleteOutfit(id)
+    setOutfits((prev) => prev.filter((outfit) => outfit.id !== id))
   }, [])
 
   const setWashStatus = useCallback(async (id: string, status: WashStatus) => {
@@ -444,6 +470,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       authReady,
       mode,
       garments,
+      outfits,
       logs,
       customAssets,
       loading,
@@ -463,6 +490,9 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       createGarment,
       updateGarment,
       deleteGarment,
+      createOutfit,
+      updateOutfit,
+      deleteOutfit,
       setWashStatus,
       clearLogs,
       connectCloud,
@@ -486,6 +516,7 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       authReady,
       mode,
       garments,
+      outfits,
       logs,
       customAssets,
       loading,
@@ -505,6 +536,9 @@ export function WardrobeProvider({ children }: { children: ReactNode }) {
       createGarment,
       updateGarment,
       deleteGarment,
+      createOutfit,
+      updateOutfit,
+      deleteOutfit,
       setWashStatus,
       clearLogs,
       connectCloud,
