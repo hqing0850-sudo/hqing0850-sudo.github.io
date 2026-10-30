@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { useWardrobe } from '../store/wardrobe'
 import type { Member } from '../types'
 import { wardrobeTitle } from '../lib/members'
+import { outfitGarmentIds } from '../lib/outfits'
 
 const ALL = '__all__'
 const NONE = '__none__'
 
 /** 衣柜切换器：首页点绿色「衣」图标、衣服页点胶囊按钮都会打开 */
 export function WardrobeSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'hero' }) {
-  const { garments, members, activeMember, setActiveMember, addMember, renameMember, deleteMember } =
+  const { garments, outfits, members, activeMember, setActiveMember, addMember, renameMember, deleteMember } =
     useWardrobe()
   const [open, setOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -88,6 +89,17 @@ export function WardrobeSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'her
     setBusy(true)
     setError('')
     try {
+      if (count > 0) {
+        const ids = new Set(
+          garments.filter((garment) => garment.memberId === deleteTarget.id).map((garment) => garment.id)
+        )
+        const usedBy = outfits.filter((outfit) =>
+          outfitGarmentIds(outfit).some((garmentId) => ids.has(garmentId))
+        )
+        if (usedBy.length > 0) {
+          throw new Error(`衣柜里有 ${usedBy.length} 套搭配用到这些衣服，请先去「搭配」删掉`)
+        }
+      }
       await deleteMember(deleteTarget.id, count > 0)
       setDeleteTarget(null)
       setTypedName('')
